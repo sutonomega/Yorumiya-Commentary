@@ -1,0 +1,221 @@
+# Yorumiya Commentary
+
+## Overview
+
+Yorumiya Commentary は、
+動画内容を理解し、
+自然なリアクションを返す
+AI実況システムを作るプロジェクト。
+
+単なる実況AIではなく、
+
+「一緒に動画を見ている存在」
+
+のような体験を目指している。
+
+---
+
+# Goals
+
+このプロジェクトでは：
+
+- 空気感
+- 自然さ
+- 存在感
+- 発話タイミング
+
+を重視する。
+
+AIが常に喋り続けるのではなく、
+必要な場面だけ、
+短く自然に反応することを目標としている。
+
+---
+
+# Current MVP Scope
+
+現在は、
+最小構成（MVP）として：
+
+- 動画入力
+- フレーム解析
+- 差分検出
+- AIコメント生成
+- 音声読み上げ
+
+の成立を目指している。
+
+---
+
+# Planned Features
+
+将来的には：
+
+- リアルタイム実況
+- OBS連携
+- Whisper統合
+- VAD
+- 感情推定
+- Companion Mode
+
+なども検討している。
+
+---
+
+# Design Philosophy
+
+## Natural Presence
+
+実況量よりも、
+場の空気を壊さないことを重視する。
+
+---
+
+## Small Local Models
+
+ローカル環境で動作可能な、
+小型LLM中心の構成を目指す。
+
+---
+
+## Modular Architecture
+
+各責務を分離し、
+拡張しやすい構造を維持する。
+
+---
+
+## Incremental Development
+
+最初から巨大な構成を作らず、
+小規模で成立させながら拡張していく。
+
+---
+
+# Project Structure
+
+`````txt
+00_overview/
+01_requirements/
+02_architecture/
+03_ai/
+04_video/
+05_audio/
+06_voice/
+07_runtime/
+08_experiments/
+09_logs/
+future_ideas/
+`````
+
+詳細な構成については：
+
+- docs_structure.md
+
+を参照。
+
+---
+
+# Documentation
+
+## Overview
+
+プロジェクト思想や方向性。
+
+- project overview
+- goals
+- concepts
+- design principles
+
+---
+
+## Requirements
+
+必要機能やMVP範囲。
+
+---
+
+## Architecture
+
+Pipeline や module構成。
+
+---
+
+## AI
+
+人格設計やPrompt設計。
+
+---
+
+## Video / Audio / Voice
+
+各技術領域。
+
+---
+
+## Runtime
+
+scheduler や logging などの実行基盤。
+
+---
+
+## Experiments
+
+技術検証やPrompt検証。
+
+---
+
+# Current Status
+
+現在は：
+
+- ドキュメント設計
+- architecture整理
+- MVP定義
+
+を進めている段階。
+
+---
+
+# Development Direction
+
+まずは：
+
+```txt
+動画
+↓
+フレーム解析
+↓
+差分検出
+↓
+短いAIリアクション
+↓
+音声出力
+```
+
+という、
+最小構成の成立を優先する。
+
+その後：
+
+- 音声解析
+- 発話制御
+- realtime化
+
+などを段階的に追加していく予定。
+
+---
+
+# Notes
+
+このプロジェクトでは：
+
+- 高テンション実況
+- 常時喋り続けるAI
+- 完全自動配信者
+
+は目指していない。
+
+「自然に一緒に見ている存在」
+
+を重視する。
