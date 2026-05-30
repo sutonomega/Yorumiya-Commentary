@@ -74,6 +74,15 @@ class RealtimePipeline:
         self.queue = queue or TaskQueue()
 
     def process_frame(self, frame: Frame, audio: AudioChunk | None = None) -> CommentaryContext:
+        context = self.build_context(frame, audio)
+        if context.event:
+            self.queue.put_event(context.event)
+        comment = self.comment_generator.generate(context)
+        if comment:
+            self.queue.put_speech(SpeechItem(timestamp=comment.timestamp, text=comment.text))
+        return context
+
+    def build_context(self, frame: Frame, audio: AudioChunk | None = None) -> CommentaryContext:
         scene = self.scene_analyzer.analyze(frame)
         event = self.event_detector.detect(scene)
         audio_features = self.audio_analyzer.analyze(audio) if audio else None
@@ -99,11 +108,6 @@ class RealtimePipeline:
             emotion=emotion,
             memory=memory,
         )
-        if event:
-            self.queue.put_event(event)
-        comment = self.comment_generator.generate(context)
-        if comment:
-            self.queue.put_speech(SpeechItem(timestamp=comment.timestamp, text=comment.text))
         return context
 
     def run_once(self, frame: Frame, on_speech: Callable[[SpeechItem], None] | None = None) -> CommentaryContext:

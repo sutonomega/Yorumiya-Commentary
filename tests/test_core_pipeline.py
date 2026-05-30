@@ -4,6 +4,8 @@ from tempfile import TemporaryDirectory
 
 from yorumiya_commentary import (
     AudioAnalyzer,
+    CommentGenerator,
+    CommentPolicy,
     CompanionMode,
     EventDetector,
     FrameFileInput,
@@ -14,7 +16,7 @@ from yorumiya_commentary import (
     VideoInput,
     VoiceActivityDetector,
 )
-from yorumiya_commentary.models import AudioChunk
+from yorumiya_commentary.models import AudioChunk, CommentaryContext, CommentaryEvent, VadResult
 
 
 class CorePipelineTest(unittest.TestCase):
@@ -102,6 +104,64 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(second_event.kind, "ui_change")
         self.assertTrue(second_event.should_speak)
         self.assertEqual(second_event.metadata["ui_added"], ["menu", "score"])
+
+    def test_frame_file_to_comment_generation_flow(self):
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "frames.jsonl"
+            path.write_text(
+                '{"timestamp": 0, "data": {"summary": "field view", "labels": ["field"], "confidence": 0.4}}\n'
+                '{"timestamp": 1, "data": {"summary": "menu opened", "labels": ["field", "menu", "score"], "ui_elements": ["menu", "score"], "confidence": 0.8}}\n',
+                encoding="utf-8",
+            )
+            frames = list(FrameFileInput(path, fps=1).iter_frames())
+
+        pipeline = RealtimePipeline()
+        pipeline.process_frame(frames[0])
+        context = pipeline.build_context(frames[1])
+        decision = pipeline.comment_generator.evaluate(context)
+
+        self.assertFalse(decision.suppressed)
+        self.assertIsNotNone(decision.comment)
+        self.assertEqual(decision.reason, "ui_change")
+        self.assertIn("UI", decision.comment.text)
+
+    def test_comment_generator_reports_suppression_reasons(self):
+        generator = CommentGenerator(policy=CommentPolicy(min_salience=0.5, stale_after_seconds=1.0))
+        low_event = CommentaryEvent(timestamp=10.0, kind="label_change", description="small change", salience=0.2, should_speak=False)
+        low_context = CommentaryContext(timestamp=10.0, event=low_event)
+
+        self.assertEqual(generator.evaluate(low_context).reason, "low_salience")
+
+        speech_context = CommentaryContext(
+            timestamp=10.0,
+            event=CommentaryEvent(timestamp=10.0, kind="label_change", description="change", salience=0.6, should_speak=True),
+            vad=VadResult(timestamp=10.0, is_speech=True, speech_ratio=0.5),
+        )
+        self.assertEqual(generator.evaluate(speech_context).reason, "vad_speech")
+
+        stale_context = CommentaryContext(
+            timestamp=12.5,
+            event=CommentaryEvent(timestamp=10.0, kind="label_change", description="old change", salience=0.9, should_speak=True),
+        )
+        self.assertEqual(generator.evaluate(stale_context).reason, "stale_context")
+
+    def test_comment_generator_suppresses_repeated_comment(self):
+        generator = CommentGenerator()
+        event = CommentaryEvent(
+            timestamp=1.0,
+            kind="label_change",
+            description="battle appears",
+            salience=0.8,
+            should_speak=True,
+            metadata={"added": ["battle"]},
+        )
+        context = CommentaryContext(timestamp=1.0, event=event)
+
+        first = generator.evaluate(context)
+        second = generator.evaluate(context)
+
+        self.assertFalse(first.suppressed)
+        self.assertEqual(second.reason, "repeated_comment")
 
     def test_audio_analyzer_and_vad_produce_timestamped_results(self):
         chunk = AudioChunk(timestamp=12.0, samples=(0.0, 0.1, 0.2, 0.0, 0.4), sample_rate=5)
