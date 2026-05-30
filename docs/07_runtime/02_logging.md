@@ -46,6 +46,19 @@
 
 `frame_trace` は frame step が実行された場合だけ入る。`speech_trace` は speech step が実行された場合だけ入る。
 
+## Trace Recorder
+
+`RuntimeTraceRecorder` は `RuntimeTickResult` または `RuntimeTickTrace` を集める軽量 recorder である。
+
+できること:
+
+- `record()`: 1件の result / trace を保存する。
+- `extend()`: result / trace の列を保存する。
+- `as_dicts()`: 保存した trace を dict の list にする。
+- `to_jsonl()`: 保存した trace を JSON Lines 文字列にする。
+
+`RuntimeTraceRecorder` は保存先を持たない。file、SQLite、metrics backend への書き込みは adapter / application layer で扱う。
+
 ## Usage
 
 `PipelineStepResult.to_trace()` で step result から trace を作れる。
@@ -53,6 +66,8 @@
 `RealtimePipeline.trace_step()` は `process_frame_step()` を実行し、queue state を含む trace を返す。
 
 `RuntimeTickResult.to_trace()` は `RuntimeTickResult` から `RuntimeTickTrace` を作る。
+
+`RuntimeTraceRecorder.to_jsonl()` は trace を JSONL として外へ渡す最小の出口である。
 
 これにより、MVP では次を外部 logging library なしで確認できる。
 
