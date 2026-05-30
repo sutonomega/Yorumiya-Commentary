@@ -3,7 +3,7 @@
 from .ai import CommentDecision, CommentGenerator, CommentPolicy, CompanionMode, EmotionEstimator, MemoryStore
 from .audio import AudioAnalyzer, VoiceActivityDetector, WhisperTranscriber
 from .event import EventDetectionConfig, EventDetector
-from .runtime import RealtimePipeline, RealtimeScheduler, SpeechQueuePolicy, TaskQueue
+from .runtime import PipelineStepResult, RealtimePipeline, RealtimeScheduler, SpeechQueuePolicy, TaskQueue
 from .scene import SceneAnalysisConfig, SceneAnalyzer
 from .video import FrameFileInput, FrameSampler, FrameSamplingPolicy, VideoInput
 from .voice import FakeVoiceSynthesizer, SpeechStyle, VoicevoxClient, VoicevoxSynthesizer, comment_to_speech_item
@@ -22,6 +22,7 @@ __all__ = [
     "FrameSamplingPolicy",
     "FakeVoiceSynthesizer",
     "MemoryStore",
+    "PipelineStepResult",
     "RealtimePipeline",
     "RealtimeScheduler",
     "SceneAnalysisConfig",

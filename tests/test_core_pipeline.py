@@ -209,6 +209,42 @@ class CorePipelineTest(unittest.TestCase):
         self.assertTrue(audio.audio.startswith(b"FAKE-WAV:"))
         self.assertEqual(fake_voice.items[0].text, audio.text)
 
+    def test_process_frame_step_exposes_decision_speech_and_audio(self):
+        frame = next(
+            VideoInput(
+                [
+                    {
+                        "summary": "menu opened",
+                        "labels": ["menu", "score"],
+                        "ui_elements": ["menu", "score"],
+                        "confidence": 0.8,
+                    }
+                ],
+                fps=1,
+            ).iter_frames()
+        )
+        fake_voice = FakeVoiceSynthesizer()
+        pipeline = RealtimePipeline(voice_synthesizer=fake_voice)
+
+        result = pipeline.process_frame_step(frame, synthesize=True)
+
+        self.assertFalse(result.comment_decision.suppressed)
+        self.assertIsNotNone(result.speech_item)
+        self.assertIsNotNone(result.speech_audio)
+        self.assertEqual(result.speech_item.text, result.speech_audio.text)
+        self.assertEqual(pipeline.queue.state()["speech"], 0)
+
+    def test_process_frame_step_reports_no_signal_without_speech(self):
+        video = VideoInput(["same scene", "same scene"], fps=1)
+        pipeline = RealtimePipeline()
+        frames = list(video.iter_frames())
+
+        pipeline.process_frame_step(frames[0])
+        result = pipeline.process_frame_step(frames[1])
+
+        self.assertEqual(result.comment_decision.reason, "no_signal")
+        self.assertIsNone(result.speech_item)
+
     def test_audio_analyzer_and_vad_produce_timestamped_results(self):
         chunk = AudioChunk(timestamp=12.0, samples=(0.0, 0.1, 0.2, 0.0, 0.4), sample_rate=5)
 

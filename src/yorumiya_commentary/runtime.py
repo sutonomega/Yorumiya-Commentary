@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from time import monotonic
 from typing import Any
 
-from .ai import CommentGenerator, EmotionEstimator
+from .ai import CommentDecision, CommentGenerator, EmotionEstimator
 from .audio import AudioAnalyzer, VoiceActivityDetector, WhisperTranscriber
 from .event import EventDetector
 from .models import AudioChunk, CommentaryContext, Frame, SpeechAudio, SpeechItem
@@ -59,6 +59,14 @@ class TaskQueue:
         return {"events": len(self.events), "speech": len(self.speech)}
 
 
+@dataclass(frozen=True)
+class PipelineStepResult:
+    context: CommentaryContext
+    comment_decision: CommentDecision
+    speech_item: SpeechItem | None = None
+    speech_audio: SpeechAudio | None = None
+
+
 @dataclass
 class RealtimeScheduler:
     tick_interval: float = 0.2
@@ -103,13 +111,26 @@ class RealtimePipeline:
         self.voice_synthesizer = voice_synthesizer
 
     def process_frame(self, frame: Frame, audio: AudioChunk | None = None) -> CommentaryContext:
+        return self.process_frame_step(frame, audio).context
+
+    def process_frame_step(self, frame: Frame, audio: AudioChunk | None = None, synthesize: bool = False) -> PipelineStepResult:
         context = self.build_context(frame, audio)
         if context.event:
             self.queue.put_event(context.event)
-        comment = self.comment_generator.generate(context)
-        if comment:
-            self.queue.put_speech(comment_to_speech_item(comment, self.speech_style))
-        return context
+
+        decision = self.comment_generator.evaluate(context)
+        speech_item = None
+        if decision.comment:
+            speech_item = comment_to_speech_item(decision.comment, self.speech_style)
+            self.queue.put_speech(speech_item)
+
+        speech_audio = self.synthesize_next_speech(now=frame.timestamp) if synthesize else None
+        return PipelineStepResult(
+            context=context,
+            comment_decision=decision,
+            speech_item=speech_item,
+            speech_audio=speech_audio,
+        )
 
     def build_context(self, frame: Frame, audio: AudioChunk | None = None) -> CommentaryContext:
         scene = self.scene_analyzer.analyze(frame)
