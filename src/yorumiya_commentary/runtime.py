@@ -9,12 +9,26 @@ from typing import Any
 from .ai import CommentGenerator, EmotionEstimator
 from .audio import AudioAnalyzer, VoiceActivityDetector, WhisperTranscriber
 from .event import EventDetector
-from .models import AudioChunk, CommentaryContext, Frame, SpeechItem
+from .models import AudioChunk, CommentaryContext, Frame, SpeechAudio, SpeechItem
 from .scene import SceneAnalyzer
+from .voice import SpeechStyle, SpeechSynthesizer, comment_to_speech_item
+
+
+@dataclass(frozen=True)
+class SpeechQueuePolicy:
+    max_items: int = 20
+    stale_after_seconds: float = 12.0
+
+    def __post_init__(self) -> None:
+        if self.max_items <= 0:
+            raise ValueError("max_items must be positive")
+        if self.stale_after_seconds <= 0:
+            raise ValueError("stale_after_seconds must be positive")
 
 
 class TaskQueue:
-    def __init__(self):
+    def __init__(self, speech_policy: SpeechQueuePolicy | None = None):
+        self.speech_policy = speech_policy or SpeechQueuePolicy()
         self.events: deque[Any] = deque()
         self.speech: deque[SpeechItem] = deque()
 
@@ -25,10 +39,21 @@ class TaskQueue:
         return self.events.popleft() if self.events else None
 
     def put_speech(self, item: SpeechItem) -> None:
+        while len(self.speech) >= self.speech_policy.max_items:
+            self.speech.popleft()
         self.speech.append(item)
 
-    def get_speech(self) -> SpeechItem | None:
+    def get_speech(self, now: float | None = None) -> SpeechItem | None:
+        if now is not None:
+            self.drop_stale_speech(now)
         return self.speech.popleft() if self.speech else None
+
+    def drop_stale_speech(self, now: float) -> int:
+        dropped = 0
+        while self.speech and now - self.speech[0].timestamp > self.speech_policy.stale_after_seconds:
+            self.speech.popleft()
+            dropped += 1
+        return dropped
 
     def state(self) -> dict[str, int]:
         return {"events": len(self.events), "speech": len(self.speech)}
@@ -63,6 +88,8 @@ class RealtimePipeline:
         vad: VoiceActivityDetector | None = None,
         transcriber: WhisperTranscriber | None = None,
         queue: TaskQueue | None = None,
+        speech_style: SpeechStyle | None = None,
+        voice_synthesizer: SpeechSynthesizer | None = None,
     ):
         self.scene_analyzer = scene_analyzer or SceneAnalyzer()
         self.event_detector = event_detector or EventDetector()
@@ -72,6 +99,8 @@ class RealtimePipeline:
         self.vad = vad or VoiceActivityDetector()
         self.transcriber = transcriber or WhisperTranscriber()
         self.queue = queue or TaskQueue()
+        self.speech_style = speech_style or SpeechStyle()
+        self.voice_synthesizer = voice_synthesizer
 
     def process_frame(self, frame: Frame, audio: AudioChunk | None = None) -> CommentaryContext:
         context = self.build_context(frame, audio)
@@ -79,7 +108,7 @@ class RealtimePipeline:
             self.queue.put_event(context.event)
         comment = self.comment_generator.generate(context)
         if comment:
-            self.queue.put_speech(SpeechItem(timestamp=comment.timestamp, text=comment.text))
+            self.queue.put_speech(comment_to_speech_item(comment, self.speech_style))
         return context
 
     def build_context(self, frame: Frame, audio: AudioChunk | None = None) -> CommentaryContext:
@@ -116,3 +145,11 @@ class RealtimePipeline:
         if speech and on_speech:
             on_speech(speech)
         return context
+
+    def synthesize_next_speech(self, now: float | None = None) -> SpeechAudio | None:
+        if self.voice_synthesizer is None:
+            return None
+        speech = self.queue.get_speech(now=now)
+        if speech is None:
+            return None
+        return self.voice_synthesizer.synthesize(speech)

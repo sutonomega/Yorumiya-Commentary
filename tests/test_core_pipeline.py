@@ -8,15 +8,20 @@ from yorumiya_commentary import (
     CommentPolicy,
     CompanionMode,
     EventDetector,
+    FakeVoiceSynthesizer,
     FrameFileInput,
     FrameSampler,
     FrameSamplingPolicy,
     RealtimePipeline,
     SceneAnalyzer,
+    SpeechQueuePolicy,
+    SpeechStyle,
+    TaskQueue,
     VideoInput,
     VoiceActivityDetector,
+    comment_to_speech_item,
 )
-from yorumiya_commentary.models import AudioChunk, CommentaryContext, CommentaryEvent, VadResult
+from yorumiya_commentary.models import AudioChunk, Comment, CommentaryContext, CommentaryEvent, SpeechItem, VadResult
 
 
 class CorePipelineTest(unittest.TestCase):
@@ -162,6 +167,47 @@ class CorePipelineTest(unittest.TestCase):
 
         self.assertFalse(first.suppressed)
         self.assertEqual(second.reason, "repeated_comment")
+
+    def test_comment_to_speech_item_applies_style(self):
+        comment = Comment(timestamp=3.0, text="UIが動いたね", priority=0.8, reason="ui_change")
+        item = comment_to_speech_item(comment, SpeechStyle(speaker=8, speed_scale=1.2, volume_scale=0.7))
+
+        self.assertEqual(item.timestamp, 3.0)
+        self.assertEqual(item.text, "UIが動いたね")
+        self.assertEqual(item.speaker, 8)
+        self.assertEqual(item.speed_scale, 1.2)
+        self.assertEqual(item.volume_scale, 0.7)
+
+    def test_task_queue_limits_and_drops_stale_speech(self):
+        queue = TaskQueue(speech_policy=SpeechQueuePolicy(max_items=2, stale_after_seconds=5.0))
+        queue.put_speech(SpeechItem(timestamp=0.0, text="first"))
+        queue.put_speech(SpeechItem(timestamp=1.0, text="second"))
+        queue.put_speech(SpeechItem(timestamp=2.0, text="third"))
+
+        self.assertEqual(queue.state()["speech"], 2)
+        self.assertEqual(queue.get_speech(now=6.5).text, "third")
+        self.assertIsNone(queue.get_speech())
+
+    def test_frame_file_to_fake_voice_synthesis_flow(self):
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "frames.jsonl"
+            path.write_text(
+                '{"timestamp": 0, "data": {"summary": "field view", "labels": ["field"], "confidence": 0.4}}\n'
+                '{"timestamp": 1, "data": {"summary": "menu opened", "labels": ["field", "menu", "score"], "ui_elements": ["menu", "score"], "confidence": 0.8}}\n',
+                encoding="utf-8",
+            )
+            frames = list(FrameFileInput(path, fps=1).iter_frames())
+
+        fake_voice = FakeVoiceSynthesizer()
+        pipeline = RealtimePipeline(voice_synthesizer=fake_voice)
+        pipeline.process_frame(frames[0])
+        pipeline.process_frame(frames[1])
+        audio = pipeline.synthesize_next_speech(now=1.0)
+
+        self.assertIsNotNone(audio)
+        self.assertEqual(audio.format, "fake-wav")
+        self.assertTrue(audio.audio.startswith(b"FAKE-WAV:"))
+        self.assertEqual(fake_voice.items[0].text, audio.text)
 
     def test_audio_analyzer_and_vad_produce_timestamped_results(self):
         chunk = AudioChunk(timestamp=12.0, samples=(0.0, 0.1, 0.2, 0.0, 0.4), sample_rate=5)

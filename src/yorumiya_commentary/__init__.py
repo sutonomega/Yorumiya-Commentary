@@ -3,10 +3,10 @@
 from .ai import CommentDecision, CommentGenerator, CommentPolicy, CompanionMode, EmotionEstimator, MemoryStore
 from .audio import AudioAnalyzer, VoiceActivityDetector, WhisperTranscriber
 from .event import EventDetectionConfig, EventDetector
-from .runtime import RealtimePipeline, RealtimeScheduler, TaskQueue
+from .runtime import RealtimePipeline, RealtimeScheduler, SpeechQueuePolicy, TaskQueue
 from .scene import SceneAnalysisConfig, SceneAnalyzer
 from .video import FrameFileInput, FrameSampler, FrameSamplingPolicy, VideoInput
-from .voice import VoicevoxClient, VoicevoxSynthesizer
+from .voice import FakeVoiceSynthesizer, SpeechStyle, VoicevoxClient, VoicevoxSynthesizer, comment_to_speech_item
 
 __all__ = [
     "AudioAnalyzer",
@@ -20,15 +20,19 @@ __all__ = [
     "FrameFileInput",
     "FrameSampler",
     "FrameSamplingPolicy",
+    "FakeVoiceSynthesizer",
     "MemoryStore",
     "RealtimePipeline",
     "RealtimeScheduler",
     "SceneAnalysisConfig",
     "SceneAnalyzer",
+    "SpeechQueuePolicy",
+    "SpeechStyle",
     "TaskQueue",
     "VideoInput",
     "VoiceActivityDetector",
     "VoicevoxClient",
     "VoicevoxSynthesizer",
     "WhisperTranscriber",
+    "comment_to_speech_item",
 ]
