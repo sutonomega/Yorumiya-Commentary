@@ -122,6 +122,21 @@ class SpeechStepResult:
         return self.speech_audio is not None
 
 
+@dataclass(frozen=True)
+class RuntimeTickResult:
+    timestamp: float
+    frame_due: bool
+    speech_due: bool
+    frame_step: PipelineStepResult | None = None
+    speech_step: SpeechStepResult | None = None
+
+    @property
+    def traces(self) -> tuple[PipelineTrace, ...]:
+        if self.frame_step is None:
+            return ()
+        return (self.frame_step.to_trace(),)
+
+
 @dataclass
 class RealtimeScheduler:
     tick_interval: float = 0.2
@@ -190,6 +205,28 @@ class RealtimePipeline:
     def trace_step(self, frame: Frame, audio: AudioChunk | None = None, synthesize: bool = False) -> PipelineTrace:
         result = self.process_frame_step(frame, audio=audio, synthesize=synthesize)
         return PipelineTrace.from_step_result(result, queue_state=self.queue.state())
+
+    def run_due_steps(
+        self,
+        scheduler: RealtimeScheduler,
+        *,
+        frame: Frame | None = None,
+        audio: AudioChunk | None = None,
+        now: float | None = None,
+    ) -> RuntimeTickResult:
+        current = monotonic() if now is None else now
+        frame_due = scheduler.due("frame", scheduler.frame_interval, now=current)
+        speech_due = scheduler.due("speech", scheduler.speech_interval, now=current)
+
+        frame_step = self.process_frame_step(frame, audio=audio) if frame_due and frame is not None else None
+        speech_step = self.run_speech_step(now=current) if speech_due else None
+        return RuntimeTickResult(
+            timestamp=current,
+            frame_due=frame_due,
+            speech_due=speech_due,
+            frame_step=frame_step,
+            speech_step=speech_step,
+        )
 
     def build_context(self, frame: Frame, audio: AudioChunk | None = None) -> CommentaryContext:
         scene = self.scene_analyzer.analyze(frame)
