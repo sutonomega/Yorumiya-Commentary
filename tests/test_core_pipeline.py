@@ -25,6 +25,7 @@ from yorumiya_commentary import (
     TaskQueue,
     VideoInput,
     VoiceActivityDetector,
+    VoiceActivityPolicy,
     WhisperTranscriber,
     comment_to_speech_item,
 )
@@ -477,9 +478,26 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(audio_trace.audio_atmosphere, "excited")
         self.assertTrue(audio_trace.vad_is_speech)
         self.assertGreater(audio_trace.vad_speech_ratio, 0.0)
+        self.assertEqual(audio_trace.vad_reason, "speech_detected")
+        self.assertEqual(audio_trace.vad_active_samples, 3)
         self.assertTrue(audio_trace.has_transcript)
         self.assertEqual(audio_trace.transcript_confidence, 0.9)
         self.assertNotIn("transcript_text", audio_trace.as_dict())
+
+    def test_voice_activity_policy_reports_detection_reasons(self):
+        strict = VoiceActivityDetector(policy=VoiceActivityPolicy(threshold=0.2, min_speech_ratio=0.75, min_active_samples=3))
+        low = strict.detect(AudioChunk(timestamp=1.0, samples=(0.0, 0.3, 0.0, 0.3), sample_rate=4))
+        speech = strict.detect(AudioChunk(timestamp=2.0, samples=(0.3, 0.4, 0.5, 0.0), sample_rate=4))
+        silent = strict.detect(AudioChunk(timestamp=3.0, samples=(), sample_rate=4))
+        inactive = strict.detect(AudioChunk(timestamp=4.0, samples=(0.01, 0.02), sample_rate=4))
+
+        self.assertFalse(low.is_speech)
+        self.assertEqual(low.reason, "low_activity")
+        self.assertEqual(low.active_samples, 2)
+        self.assertTrue(speech.is_speech)
+        self.assertEqual(speech.reason, "speech_detected")
+        self.assertEqual(silent.reason, "silent")
+        self.assertEqual(inactive.reason, "no_active_samples")
 
     def test_audio_analyzer_and_vad_produce_timestamped_results(self):
         chunk = AudioChunk(timestamp=12.0, samples=(0.0, 0.1, 0.2, 0.0, 0.4), sample_rate=5)
@@ -489,6 +507,7 @@ class CorePipelineTest(unittest.TestCase):
 
         self.assertTrue(vad.is_speech)
         self.assertEqual(vad.start, 12.0)
+        self.assertEqual(vad.reason, "speech_detected")
         self.assertIn(audio.atmosphere, {"active", "excited"})
 
     def test_realtime_pipeline_merges_audio_into_context(self):

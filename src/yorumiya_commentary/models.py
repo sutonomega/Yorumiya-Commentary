@@ -41,6 +41,8 @@ class VadResult:
     speech_ratio: float
     start: float | None = None
     end: float | None = None
+    reason: str = "unknown"
+    active_samples: int = 0
 
 
 @dataclass(frozen=True)

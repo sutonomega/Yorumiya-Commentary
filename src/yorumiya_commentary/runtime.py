@@ -82,6 +82,8 @@ class AudioContextTrace:
     audio_peak: float | None = None
     vad_is_speech: bool | None = None
     vad_speech_ratio: float | None = None
+    vad_reason: str | None = None
+    vad_active_samples: int | None = None
     has_transcript: bool = False
     transcript_confidence: float | None = None
 
@@ -100,6 +102,8 @@ class AudioContextTrace:
             audio_peak=audio.peak if audio else None,
             vad_is_speech=vad.is_speech if vad else None,
             vad_speech_ratio=vad.speech_ratio if vad else None,
+            vad_reason=vad.reason if vad else None,
+            vad_active_samples=vad.active_samples if vad else None,
             has_transcript=bool(transcript and transcript.text),
             transcript_confidence=transcript.confidence if transcript else None,
         )
@@ -115,6 +119,8 @@ class AudioContextTrace:
             "audio_peak": self.audio_peak,
             "vad_is_speech": self.vad_is_speech,
             "vad_speech_ratio": self.vad_speech_ratio,
+            "vad_reason": self.vad_reason,
+            "vad_active_samples": self.vad_active_samples,
             "has_transcript": self.has_transcript,
             "transcript_confidence": self.transcript_confidence,
         }
