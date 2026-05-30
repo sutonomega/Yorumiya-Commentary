@@ -66,6 +66,50 @@ class PipelineStepResult:
     speech_item: SpeechItem | None = None
     speech_audio: SpeechAudio | None = None
 
+    def to_trace(self) -> "PipelineTrace":
+        return PipelineTrace.from_step_result(self)
+
+
+@dataclass(frozen=True)
+class PipelineTrace:
+    timestamp: float
+    event_kind: str | None
+    event_salience: float | None
+    decision_reason: str
+    suppressed: bool
+    has_comment: bool
+    has_speech_item: bool
+    has_speech_audio: bool
+    queue_speech_count: int | None = None
+
+    @classmethod
+    def from_step_result(cls, result: PipelineStepResult, queue_state: dict[str, int] | None = None) -> "PipelineTrace":
+        event = result.context.event
+        return cls(
+            timestamp=result.context.timestamp,
+            event_kind=event.kind if event else None,
+            event_salience=event.salience if event else None,
+            decision_reason=result.comment_decision.reason,
+            suppressed=result.comment_decision.suppressed,
+            has_comment=result.comment_decision.comment is not None,
+            has_speech_item=result.speech_item is not None,
+            has_speech_audio=result.speech_audio is not None,
+            queue_speech_count=queue_state.get("speech") if queue_state else None,
+        )
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "timestamp": self.timestamp,
+            "event_kind": self.event_kind,
+            "event_salience": self.event_salience,
+            "decision_reason": self.decision_reason,
+            "suppressed": self.suppressed,
+            "has_comment": self.has_comment,
+            "has_speech_item": self.has_speech_item,
+            "has_speech_audio": self.has_speech_audio,
+            "queue_speech_count": self.queue_speech_count,
+        }
+
 
 @dataclass
 class RealtimeScheduler:
@@ -131,6 +175,10 @@ class RealtimePipeline:
             speech_item=speech_item,
             speech_audio=speech_audio,
         )
+
+    def trace_step(self, frame: Frame, audio: AudioChunk | None = None, synthesize: bool = False) -> PipelineTrace:
+        result = self.process_frame_step(frame, audio=audio, synthesize=synthesize)
+        return PipelineTrace.from_step_result(result, queue_state=self.queue.state())
 
     def build_context(self, frame: Frame, audio: AudioChunk | None = None) -> CommentaryContext:
         scene = self.scene_analyzer.analyze(frame)
