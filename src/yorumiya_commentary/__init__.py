@@ -11,8 +11,10 @@ from .runtime import (
     RealtimeScheduler,
     RuntimeTick,
     RuntimeTickResult,
+    RuntimeTickTrace,
     SpeechQueuePolicy,
     SpeechStepResult,
+    SpeechTrace,
     TaskQueue,
 )
 from .scene import SceneAnalysisConfig, SceneAnalyzer
@@ -40,10 +42,12 @@ __all__ = [
     "RealtimeScheduler",
     "RuntimeTick",
     "RuntimeTickResult",
+    "RuntimeTickTrace",
     "SceneAnalysisConfig",
     "SceneAnalyzer",
     "SpeechQueuePolicy",
     "SpeechStepResult",
+    "SpeechTrace",
     "SpeechStyle",
     "TaskQueue",
     "VideoInput",

@@ -123,6 +123,40 @@ class SpeechStepResult:
 
 
 @dataclass(frozen=True)
+class SpeechTrace:
+    timestamp: float
+    synthesized: bool
+    skipped_reason: str | None
+    has_speech_item: bool
+    has_speech_audio: bool
+    speech_timestamp: float | None = None
+    audio_format: str | None = None
+
+    @classmethod
+    def from_step_result(cls, result: SpeechStepResult, timestamp: float) -> "SpeechTrace":
+        return cls(
+            timestamp=timestamp,
+            synthesized=result.synthesized,
+            skipped_reason=result.skipped_reason,
+            has_speech_item=result.speech_item is not None,
+            has_speech_audio=result.speech_audio is not None,
+            speech_timestamp=result.speech_item.timestamp if result.speech_item else None,
+            audio_format=result.speech_audio.format if result.speech_audio else None,
+        )
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "timestamp": self.timestamp,
+            "synthesized": self.synthesized,
+            "skipped_reason": self.skipped_reason,
+            "has_speech_item": self.has_speech_item,
+            "has_speech_audio": self.has_speech_audio,
+            "speech_timestamp": self.speech_timestamp,
+            "audio_format": self.audio_format,
+        }
+
+
+@dataclass(frozen=True)
 class RuntimeTickResult:
     timestamp: float
     frame_due: bool
@@ -135,6 +169,37 @@ class RuntimeTickResult:
         if self.frame_step is None:
             return ()
         return (self.frame_step.to_trace(),)
+
+    def to_trace(self) -> "RuntimeTickTrace":
+        return RuntimeTickTrace.from_tick_result(self)
+
+
+@dataclass(frozen=True)
+class RuntimeTickTrace:
+    timestamp: float
+    frame_due: bool
+    speech_due: bool
+    frame_trace: PipelineTrace | None = None
+    speech_trace: SpeechTrace | None = None
+
+    @classmethod
+    def from_tick_result(cls, result: RuntimeTickResult) -> "RuntimeTickTrace":
+        return cls(
+            timestamp=result.timestamp,
+            frame_due=result.frame_due,
+            speech_due=result.speech_due,
+            frame_trace=result.frame_step.to_trace() if result.frame_step else None,
+            speech_trace=SpeechTrace.from_step_result(result.speech_step, result.timestamp) if result.speech_step else None,
+        )
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "timestamp": self.timestamp,
+            "frame_due": self.frame_due,
+            "speech_due": self.speech_due,
+            "frame_trace": self.frame_trace.as_dict() if self.frame_trace else None,
+            "speech_trace": self.speech_trace.as_dict() if self.speech_trace else None,
+        }
 
 
 @dataclass(frozen=True)
