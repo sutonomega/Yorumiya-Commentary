@@ -18,6 +18,23 @@
 - `has_speech_audio`
 - `queue_speech_count`
 - `audio_trace`
+- `event_selection`
+
+## Event Selection Trace
+
+`EventSelectionTrace` は scene event と audio event のどちらを `CommentaryContext.event` に採用したかを記録する。
+
+記録するもの:
+
+- `selected_kind`
+- `selected_source`
+- `reason`
+- `scene_event_kind`
+- `scene_event_salience`
+- `audio_event_kind`
+- `audio_event_salience`
+
+`reason` は `scene_only`、`audio_only`、`audio_higher_salience`、`scene_higher_or_equal_salience`、`no_event` のいずれかである。
 
 ## Audio Context Trace
 

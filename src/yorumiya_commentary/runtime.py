@@ -66,9 +66,59 @@ class PipelineStepResult:
     comment_decision: CommentDecision
     speech_item: SpeechItem | None = None
     speech_audio: SpeechAudio | None = None
+    event_selection: "EventSelectionTrace | None" = None
 
     def to_trace(self) -> "PipelineTrace":
         return PipelineTrace.from_step_result(self)
+
+
+@dataclass(frozen=True)
+class EventSelectionTrace:
+    selected_kind: str | None
+    selected_source: str | None
+    reason: str
+    scene_event_kind: str | None = None
+    scene_event_salience: float | None = None
+    audio_event_kind: str | None = None
+    audio_event_salience: float | None = None
+
+    @classmethod
+    def from_events(
+        cls,
+        scene_event: CommentaryEvent | None,
+        audio_event: CommentaryEvent | None,
+        selected: CommentaryEvent | None,
+    ) -> "EventSelectionTrace":
+        if scene_event is None and audio_event is None:
+            reason = "no_event"
+        elif scene_event is None:
+            reason = "audio_only"
+        elif audio_event is None:
+            reason = "scene_only"
+        elif selected is audio_event:
+            reason = "audio_higher_salience"
+        else:
+            reason = "scene_higher_or_equal_salience"
+        return cls(
+            selected_kind=selected.kind if selected else None,
+            selected_source=selected.metadata.get("source", "scene") if selected else None,
+            reason=reason,
+            scene_event_kind=scene_event.kind if scene_event else None,
+            scene_event_salience=scene_event.salience if scene_event else None,
+            audio_event_kind=audio_event.kind if audio_event else None,
+            audio_event_salience=audio_event.salience if audio_event else None,
+        )
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "selected_kind": self.selected_kind,
+            "selected_source": self.selected_source,
+            "reason": self.reason,
+            "scene_event_kind": self.scene_event_kind,
+            "scene_event_salience": self.scene_event_salience,
+            "audio_event_kind": self.audio_event_kind,
+            "audio_event_salience": self.audio_event_salience,
+        }
 
 
 @dataclass(frozen=True)
@@ -138,6 +188,7 @@ class PipelineTrace:
     has_speech_audio: bool
     queue_speech_count: int | None = None
     audio_trace: AudioContextTrace | None = None
+    event_selection: EventSelectionTrace | None = None
 
     @classmethod
     def from_step_result(cls, result: PipelineStepResult, queue_state: dict[str, int] | None = None) -> "PipelineTrace":
@@ -153,6 +204,7 @@ class PipelineTrace:
             has_speech_audio=result.speech_audio is not None,
             queue_speech_count=queue_state.get("speech") if queue_state else None,
             audio_trace=AudioContextTrace.from_context(result.context),
+            event_selection=result.event_selection,
         )
 
     def as_dict(self) -> dict[str, object]:
@@ -167,6 +219,7 @@ class PipelineTrace:
             "has_speech_audio": self.has_speech_audio,
             "queue_speech_count": self.queue_speech_count,
             "audio_trace": self.audio_trace.as_dict() if self.audio_trace else None,
+            "event_selection": self.event_selection.as_dict() if self.event_selection else None,
         }
 
 
@@ -339,7 +392,7 @@ class RealtimePipeline:
         return self.process_frame_step(frame, audio).context
 
     def process_frame_step(self, frame: Frame, audio: AudioChunk | None = None, synthesize: bool = False) -> PipelineStepResult:
-        context = self.build_context(frame, audio)
+        context, event_selection = self.build_context_with_selection(frame, audio)
         if context.event:
             self.queue.put_event(context.event)
 
@@ -355,6 +408,7 @@ class RealtimePipeline:
             comment_decision=decision,
             speech_item=speech_item,
             speech_audio=speech_audio,
+            event_selection=event_selection,
         )
 
     def trace_step(self, frame: Frame, audio: AudioChunk | None = None, synthesize: bool = False) -> PipelineTrace:
@@ -384,11 +438,19 @@ class RealtimePipeline:
         )
 
     def build_context(self, frame: Frame, audio: AudioChunk | None = None) -> CommentaryContext:
+        return self.build_context_with_selection(frame, audio)[0]
+
+    def build_context_with_selection(
+        self,
+        frame: Frame,
+        audio: AudioChunk | None = None,
+    ) -> tuple[CommentaryContext, EventSelectionTrace]:
         scene = self.scene_analyzer.analyze(frame)
         scene_event = self.event_detector.detect(scene)
         audio_features = self.audio_analyzer.analyze(audio) if audio else None
         audio_event = self.audio_event_detector.detect(audio_features)
         event = self._select_event(scene_event, audio_event)
+        event_selection = EventSelectionTrace.from_events(scene_event, audio_event, event)
         vad_result = self.vad.detect(audio) if audio else None
         transcript = self.transcriber.transcribe(audio) if audio else None
         context = CommentaryContext(
@@ -411,7 +473,7 @@ class RealtimePipeline:
             emotion=emotion,
             memory=memory,
         )
-        return context
+        return context, event_selection
 
     def _select_event(
         self,

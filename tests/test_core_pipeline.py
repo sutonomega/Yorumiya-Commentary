@@ -11,6 +11,7 @@ from yorumiya_commentary import (
     CommentPolicy,
     CompanionMode,
     EventDetector,
+    EventSelectionTrace,
     FakeVoiceSynthesizer,
     FrameFileInput,
     FrameSampler,
@@ -587,6 +588,21 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(result.context.event.kind, "audio_impact")
         self.assertEqual(result.comment_decision.reason, "audio_impact")
         self.assertIsNotNone(result.speech_item)
+
+    def test_pipeline_trace_records_event_selection_reason(self):
+        frame = next(VideoInput(["quiet field"], fps=1).iter_frames())
+        chunk = AudioChunk(timestamp=0.0, samples=(0.0, 0.9, 0.1), sample_rate=3)
+
+        result = RealtimePipeline().process_frame_step(frame, audio=chunk)
+        selection = result.to_trace().event_selection
+
+        self.assertIsInstance(selection, EventSelectionTrace)
+        self.assertEqual(selection.reason, "audio_higher_salience")
+        self.assertEqual(selection.selected_source, "audio")
+        self.assertEqual(selection.scene_event_kind, "scene_initial")
+        self.assertEqual(selection.audio_event_kind, "audio_impact")
+        self.assertGreater(selection.audio_event_salience, selection.scene_event_salience)
+        self.assertEqual(selection.as_dict()["selected_kind"], "audio_impact")
 
     def test_realtime_pipeline_merges_audio_into_context(self):
         frame = next(VideoInput(["battle critical hit"], fps=1).iter_frames())
