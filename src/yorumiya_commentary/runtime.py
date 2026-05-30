@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from time import monotonic
 from typing import Any
@@ -135,6 +135,13 @@ class RuntimeTickResult:
         if self.frame_step is None:
             return ()
         return (self.frame_step.to_trace(),)
+
+
+@dataclass(frozen=True)
+class RuntimeTick:
+    timestamp: float
+    frame: Frame | None = None
+    audio: AudioChunk | None = None
 
 
 @dataclass
@@ -273,3 +280,23 @@ class RealtimePipeline:
         if speech is None:
             return SpeechStepResult(skipped_reason="no_speech")
         return SpeechStepResult(speech_item=speech, speech_audio=self.voice_synthesizer.synthesize(speech))
+
+
+@dataclass
+class RealtimeLoop:
+    pipeline: RealtimePipeline = field(default_factory=RealtimePipeline)
+    scheduler: RealtimeScheduler = field(default_factory=RealtimeScheduler)
+
+    def step(self, tick: RuntimeTick) -> RuntimeTickResult:
+        return self.pipeline.run_due_steps(
+            self.scheduler,
+            frame=tick.frame,
+            audio=tick.audio,
+            now=tick.timestamp,
+        )
+
+    def run(self, ticks: Iterable[RuntimeTick]) -> list[RuntimeTickResult]:
+        return [self.step(tick) for tick in ticks]
+
+    def run_frames(self, frames: Iterable[Frame]) -> list[RuntimeTickResult]:
+        return [self.step(RuntimeTick(timestamp=frame.timestamp, frame=frame)) for frame in frames]

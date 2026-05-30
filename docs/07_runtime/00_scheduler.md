@@ -38,3 +38,14 @@ scheduler は tick、frame、inference、speech の周期を管理する。`Real
 戻り値は `RuntimeTickResult` で、`frame_due`、`speech_due`、`frame_step`、`speech_step` を確認できる。
 
 これは本格的な realtime loop ではなく、M3 で loop を組むための小さな bridge である。
+
+## Loop Runner
+
+`RealtimeLoop` は `RuntimeTick` の列を順に処理する軽量 runner である。
+
+- `RuntimeTick`: timestamp と任意の `frame` / `audio` を持つ。
+- `RealtimeLoop.step()`: 1 tick を `run_due_steps()` に渡す。
+- `RealtimeLoop.run()`: tick 列を処理し、`RuntimeTickResult` の list を返す。
+- `RealtimeLoop.run_frames()`: frame timestamp を tick timestamp として扱う。
+
+`RealtimeLoop` は sleep、thread、asyncio を持たない。実時間の待機や停止制御は M3 以降の adapter / application layer で扱う。

@@ -12,8 +12,10 @@ from yorumiya_commentary import (
     FrameFileInput,
     FrameSampler,
     FrameSamplingPolicy,
+    RealtimeLoop,
     RealtimePipeline,
     RealtimeScheduler,
+    RuntimeTick,
     SceneAnalyzer,
     SpeechQueuePolicy,
     SpeechStyle,
@@ -340,6 +342,42 @@ class CorePipelineTest(unittest.TestCase):
         self.assertFalse(speech_only.frame_due)
         self.assertTrue(speech_only.speech_due)
         self.assertEqual(speech_only.speech_step.skipped_reason, "no_speech")
+
+    def test_realtime_loop_runs_deterministic_ticks(self):
+        frame = next(
+            VideoInput(
+                [
+                    {
+                        "summary": "menu opened",
+                        "labels": ["menu", "score"],
+                        "ui_elements": ["menu", "score"],
+                        "confidence": 0.8,
+                    }
+                ],
+                fps=1,
+            ).iter_frames()
+        )
+        loop = RealtimeLoop(
+            pipeline=RealtimePipeline(voice_synthesizer=FakeVoiceSynthesizer()),
+            scheduler=RealtimeScheduler(frame_interval=1.0, speech_interval=0.5),
+        )
+
+        results = loop.run(
+            [
+                RuntimeTick(timestamp=0.0, frame=frame),
+                RuntimeTick(timestamp=0.25),
+                RuntimeTick(timestamp=0.5),
+            ]
+        )
+
+        self.assertTrue(results[0].frame_due)
+        self.assertTrue(results[0].speech_due)
+        self.assertTrue(results[0].speech_step.synthesized)
+        self.assertFalse(results[1].frame_due)
+        self.assertFalse(results[1].speech_due)
+        self.assertFalse(results[2].frame_due)
+        self.assertTrue(results[2].speech_due)
+        self.assertEqual(results[2].speech_step.skipped_reason, "no_speech")
 
     def test_audio_analyzer_and_vad_produce_timestamped_results(self):
         chunk = AudioChunk(timestamp=12.0, samples=(0.0, 0.1, 0.2, 0.0, 0.4), sample_rate=5)
