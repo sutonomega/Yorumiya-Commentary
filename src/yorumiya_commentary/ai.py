@@ -7,6 +7,7 @@ from .models import Comment, CommentaryContext, EmotionState, now_timestamp
 
 
 SUPPRESSION_VAD_SPEECH = "vad_speech"
+SUPPRESSION_TRANSCRIPT_SPEECH = "transcript_speech"
 SUPPRESSION_LOW_SALIENCE = "low_salience"
 SUPPRESSION_REPEATED_COMMENT = "repeated_comment"
 SUPPRESSION_STALE_CONTEXT = "stale_context"
@@ -18,12 +19,19 @@ class CommentPolicy:
     max_length: int = 42
     min_salience: float = 0.45
     vad_interrupt_salience: float = 0.8
+    transcript_interrupt_confidence: float = 0.65
+    transcript_interrupt_salience: float = 0.8
     stale_after_seconds: float = 8.0
 
     def __post_init__(self) -> None:
         if self.max_length <= 0:
             raise ValueError("max_length must be positive")
-        for name, value in (("min_salience", self.min_salience), ("vad_interrupt_salience", self.vad_interrupt_salience)):
+        for name, value in (
+            ("min_salience", self.min_salience),
+            ("vad_interrupt_salience", self.vad_interrupt_salience),
+            ("transcript_interrupt_confidence", self.transcript_interrupt_confidence),
+            ("transcript_interrupt_salience", self.transcript_interrupt_salience),
+        ):
             if not 0.0 <= value <= 1.0:
                 raise ValueError(f"{name} must be between 0.0 and 1.0")
         if self.stale_after_seconds <= 0:
@@ -118,9 +126,19 @@ class CommentGenerator:
             return SUPPRESSION_STALE_CONTEXT
         if context.vad and context.vad.is_speech and (not context.event or context.event.salience < self.policy.vad_interrupt_salience):
             return SUPPRESSION_VAD_SPEECH
+        if self._has_interrupting_transcript(context):
+            return SUPPRESSION_TRANSCRIPT_SPEECH
         if context.event and (not context.event.should_speak or context.event.salience < self.policy.min_salience):
             return SUPPRESSION_LOW_SALIENCE
         return None
+
+    def _has_interrupting_transcript(self, context: CommentaryContext) -> bool:
+        transcript = context.transcript
+        if not transcript or not transcript.text:
+            return False
+        if transcript.confidence < self.policy.transcript_interrupt_confidence:
+            return False
+        return not context.event or context.event.salience < self.policy.transcript_interrupt_salience
 
     def _template(self, context: CommentaryContext) -> tuple[str, float, str] | None:
         if context.event:
