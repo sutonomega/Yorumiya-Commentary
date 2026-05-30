@@ -1,10 +1,14 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from yorumiya_commentary import (
     AudioAnalyzer,
     CompanionMode,
     EventDetector,
+    FrameFileInput,
     FrameSampler,
+    FrameSamplingPolicy,
     RealtimePipeline,
     VideoInput,
     VoiceActivityDetector,
@@ -23,6 +27,26 @@ class CorePipelineTest(unittest.TestCase):
 
         self.assertIsNotNone(context.scene)
         self.assertGreaterEqual(pipeline.queue.state()["speech"], 1)
+
+    def test_frame_file_input_reads_plain_and_json_lines(self):
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "frames.jsonl"
+            path.write_text('menu score\n{"timestamp": 2.5, "data": "battle critical"}\n', encoding="utf-8")
+
+            frames = list(FrameFileInput(path, fps=1).iter_frames())
+
+        self.assertEqual(frames[0].timestamp, 0.0)
+        self.assertEqual(frames[0].data, "menu score")
+        self.assertEqual(frames[1].timestamp, 2.5)
+        self.assertEqual(frames[1].data, "battle critical")
+
+    def test_frame_sampler_policy_limits_range_and_count(self):
+        video = VideoInput(["f0", "f1", "f2", "f3", "f4"], fps=1)
+        policy = FrameSamplingPolicy(interval_seconds=1.5, start_timestamp=1.0, end_timestamp=4.0, max_frames=2)
+
+        frames = list(FrameSampler(policy=policy).sample(video.iter_frames()))
+
+        self.assertEqual([frame.index for frame in frames], [1, 3])
 
     def test_event_detector_suppresses_unchanged_scene(self):
         video = VideoInput(["same scene", "same scene"], fps=1)

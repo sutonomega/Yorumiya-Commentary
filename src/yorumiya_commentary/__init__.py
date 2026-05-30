@@ -5,7 +5,7 @@ from .audio import AudioAnalyzer, VoiceActivityDetector, WhisperTranscriber
 from .event import EventDetector
 from .runtime import RealtimePipeline, RealtimeScheduler, TaskQueue
 from .scene import SceneAnalyzer
-from .video import FrameSampler, VideoInput
+from .video import FrameFileInput, FrameSampler, FrameSamplingPolicy, VideoInput
 from .voice import VoicevoxClient, VoicevoxSynthesizer
 
 __all__ = [
@@ -14,7 +14,9 @@ __all__ = [
     "CompanionMode",
     "EmotionEstimator",
     "EventDetector",
+    "FrameFileInput",
     "FrameSampler",
+    "FrameSamplingPolicy",
     "MemoryStore",
     "RealtimePipeline",
     "RealtimeScheduler",
