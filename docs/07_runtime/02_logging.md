@@ -17,6 +17,27 @@
 - `has_speech_item`
 - `has_speech_audio`
 - `queue_speech_count`
+- `audio_trace`
+
+## Audio Context Trace
+
+`AudioContextTrace` は `CommentaryContext` に含まれる audio / VAD / transcript の状態を記録する。
+
+記録するもの:
+
+- `timestamp`
+- `has_audio`
+- `audio_loudness`
+- `audio_atmosphere`
+- `audio_event`
+- `audio_rms`
+- `audio_peak`
+- `vad_is_speech`
+- `vad_speech_ratio`
+- `has_transcript`
+- `transcript_confidence`
+
+raw transcript text は recorder には入れない。会話内容の保存は後続の adapter / application layer で明示的に扱う。
 
 ## Speech Trace
 

@@ -72,6 +72,55 @@ class PipelineStepResult:
 
 
 @dataclass(frozen=True)
+class AudioContextTrace:
+    timestamp: float
+    has_audio: bool
+    audio_loudness: str | None = None
+    audio_atmosphere: str | None = None
+    audio_event: str | None = None
+    audio_rms: float | None = None
+    audio_peak: float | None = None
+    vad_is_speech: bool | None = None
+    vad_speech_ratio: float | None = None
+    has_transcript: bool = False
+    transcript_confidence: float | None = None
+
+    @classmethod
+    def from_context(cls, context: CommentaryContext) -> "AudioContextTrace":
+        audio = context.audio
+        vad = context.vad
+        transcript = context.transcript
+        return cls(
+            timestamp=context.timestamp,
+            has_audio=audio is not None,
+            audio_loudness=audio.loudness if audio else None,
+            audio_atmosphere=audio.atmosphere if audio else None,
+            audio_event=audio.event if audio else None,
+            audio_rms=audio.rms if audio else None,
+            audio_peak=audio.peak if audio else None,
+            vad_is_speech=vad.is_speech if vad else None,
+            vad_speech_ratio=vad.speech_ratio if vad else None,
+            has_transcript=bool(transcript and transcript.text),
+            transcript_confidence=transcript.confidence if transcript else None,
+        )
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "timestamp": self.timestamp,
+            "has_audio": self.has_audio,
+            "audio_loudness": self.audio_loudness,
+            "audio_atmosphere": self.audio_atmosphere,
+            "audio_event": self.audio_event,
+            "audio_rms": self.audio_rms,
+            "audio_peak": self.audio_peak,
+            "vad_is_speech": self.vad_is_speech,
+            "vad_speech_ratio": self.vad_speech_ratio,
+            "has_transcript": self.has_transcript,
+            "transcript_confidence": self.transcript_confidence,
+        }
+
+
+@dataclass(frozen=True)
 class PipelineTrace:
     timestamp: float
     event_kind: str | None
@@ -82,6 +131,7 @@ class PipelineTrace:
     has_speech_item: bool
     has_speech_audio: bool
     queue_speech_count: int | None = None
+    audio_trace: AudioContextTrace | None = None
 
     @classmethod
     def from_step_result(cls, result: PipelineStepResult, queue_state: dict[str, int] | None = None) -> "PipelineTrace":
@@ -96,6 +146,7 @@ class PipelineTrace:
             has_speech_item=result.speech_item is not None,
             has_speech_audio=result.speech_audio is not None,
             queue_speech_count=queue_state.get("speech") if queue_state else None,
+            audio_trace=AudioContextTrace.from_context(result.context),
         )
 
     def as_dict(self) -> dict[str, object]:
@@ -109,6 +160,7 @@ class PipelineTrace:
             "has_speech_item": self.has_speech_item,
             "has_speech_audio": self.has_speech_audio,
             "queue_speech_count": self.queue_speech_count,
+            "audio_trace": self.audio_trace.as_dict() if self.audio_trace else None,
         }
 
 
