@@ -2,9 +2,9 @@
 
 from .ai import CommentGenerator, CompanionMode, EmotionEstimator, MemoryStore
 from .audio import AudioAnalyzer, VoiceActivityDetector, WhisperTranscriber
-from .event import EventDetector
+from .event import EventDetectionConfig, EventDetector
 from .runtime import RealtimePipeline, RealtimeScheduler, TaskQueue
-from .scene import SceneAnalyzer
+from .scene import SceneAnalysisConfig, SceneAnalyzer
 from .video import FrameFileInput, FrameSampler, FrameSamplingPolicy, VideoInput
 from .voice import VoicevoxClient, VoicevoxSynthesizer
 
@@ -13,6 +13,7 @@ __all__ = [
     "CommentGenerator",
     "CompanionMode",
     "EmotionEstimator",
+    "EventDetectionConfig",
     "EventDetector",
     "FrameFileInput",
     "FrameSampler",
@@ -20,6 +21,7 @@ __all__ = [
     "MemoryStore",
     "RealtimePipeline",
     "RealtimeScheduler",
+    "SceneAnalysisConfig",
     "SceneAnalyzer",
     "TaskQueue",
     "VideoInput",

@@ -10,6 +10,7 @@ from yorumiya_commentary import (
     FrameSampler,
     FrameSamplingPolicy,
     RealtimePipeline,
+    SceneAnalyzer,
     VideoInput,
     VoiceActivityDetector,
 )
@@ -59,6 +60,48 @@ class CorePipelineTest(unittest.TestCase):
 
         self.assertIsNotNone(first.event)
         self.assertIsNone(second.event)
+
+    def test_scene_analyzer_normalizes_structured_payload(self):
+        frame = next(
+            VideoInput(
+                [
+                    {
+                        "summary": "Battle menu score visible",
+                        "labels": ["Battle", "Menu", "Menu", "HP", "x"],
+                        "ui_elements": ["menu", "hp"],
+                        "confidence": 1.2,
+                    }
+                ],
+                fps=1,
+            ).iter_frames()
+        )
+
+        scene = SceneAnalyzer().analyze(frame)
+
+        self.assertEqual(scene.labels, ("battle", "menu"))
+        self.assertEqual(scene.ui_elements, ("menu", "hp"))
+        self.assertEqual(scene.confidence, 1.0)
+
+    def test_frame_file_to_scene_to_event_flow_detects_ui_change(self):
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "frames.jsonl"
+            path.write_text(
+                '{"timestamp": 0, "data": {"summary": "field view", "labels": ["field"], "confidence": 0.4}}\n'
+                '{"timestamp": 1, "data": {"summary": "menu opened", "labels": ["field", "menu", "score"], "ui_elements": ["menu", "score"], "confidence": 0.8}}\n',
+                encoding="utf-8",
+            )
+
+            frames = list(FrameFileInput(path, fps=1).iter_frames())
+
+        analyzer = SceneAnalyzer()
+        detector = EventDetector()
+        first_event = detector.detect(analyzer.analyze(frames[0]))
+        second_event = detector.detect(analyzer.analyze(frames[1]))
+
+        self.assertEqual(first_event.kind, "scene_initial")
+        self.assertEqual(second_event.kind, "ui_change")
+        self.assertTrue(second_event.should_speak)
+        self.assertEqual(second_event.metadata["ui_added"], ["menu", "score"])
 
     def test_audio_analyzer_and_vad_produce_timestamped_results(self):
         chunk = AudioChunk(timestamp=12.0, samples=(0.0, 0.1, 0.2, 0.0, 0.4), sample_rate=5)
