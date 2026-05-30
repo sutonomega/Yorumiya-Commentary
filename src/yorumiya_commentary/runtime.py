@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections import deque
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
@@ -200,6 +201,28 @@ class RuntimeTickTrace:
             "frame_trace": self.frame_trace.as_dict() if self.frame_trace else None,
             "speech_trace": self.speech_trace.as_dict() if self.speech_trace else None,
         }
+
+
+@dataclass
+class RuntimeTraceRecorder:
+    traces: list[RuntimeTickTrace] = field(default_factory=list)
+
+    def record(self, result: RuntimeTickResult | RuntimeTickTrace) -> RuntimeTickTrace:
+        trace = result if isinstance(result, RuntimeTickTrace) else result.to_trace()
+        self.traces.append(trace)
+        return trace
+
+    def extend(self, results: Iterable[RuntimeTickResult | RuntimeTickTrace]) -> list[RuntimeTickTrace]:
+        return [self.record(result) for result in results]
+
+    def as_dicts(self) -> list[dict[str, object]]:
+        return [trace.as_dict() for trace in self.traces]
+
+    def to_jsonl(self) -> str:
+        if not self.traces:
+            return ""
+        lines = [json.dumps(trace.as_dict(), ensure_ascii=False) for trace in self.traces]
+        return "\n".join(lines) + "\n"
 
 
 @dataclass(frozen=True)
