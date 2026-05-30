@@ -6,6 +6,37 @@ from dataclasses import dataclass, field
 from .models import Comment, CommentaryContext, EmotionState, now_timestamp
 
 
+SUPPRESSION_VAD_SPEECH = "vad_speech"
+SUPPRESSION_LOW_SALIENCE = "low_salience"
+SUPPRESSION_REPEATED_COMMENT = "repeated_comment"
+SUPPRESSION_STALE_CONTEXT = "stale_context"
+SUPPRESSION_NO_SIGNAL = "no_signal"
+
+
+@dataclass(frozen=True)
+class CommentPolicy:
+    max_length: int = 42
+    min_salience: float = 0.45
+    vad_interrupt_salience: float = 0.8
+    stale_after_seconds: float = 8.0
+
+    def __post_init__(self) -> None:
+        if self.max_length <= 0:
+            raise ValueError("max_length must be positive")
+        for name, value in (("min_salience", self.min_salience), ("vad_interrupt_salience", self.vad_interrupt_salience)):
+            if not 0.0 <= value <= 1.0:
+                raise ValueError(f"{name} must be between 0.0 and 1.0")
+        if self.stale_after_seconds <= 0:
+            raise ValueError("stale_after_seconds must be positive")
+
+
+@dataclass(frozen=True)
+class CommentDecision:
+    comment: Comment | None
+    suppressed: bool
+    reason: str
+
+
 class MemoryStore:
     def __init__(self, short_limit: int = 20, long_limit: int = 200):
         self.short_memory: deque[str] = deque(maxlen=short_limit)
@@ -58,43 +89,71 @@ class EmotionEstimator:
 
 
 class CommentGenerator:
-    def __init__(self, memory: MemoryStore | None = None, max_length: int = 42):
+    def __init__(self, memory: MemoryStore | None = None, max_length: int = 42, policy: CommentPolicy | None = None):
         self.memory = memory or MemoryStore()
-        self.max_length = max_length
+        self.policy = policy or CommentPolicy(max_length=max_length)
+
+    def evaluate(self, context: CommentaryContext) -> CommentDecision:
+        suppression_reason = self._suppression_reason(context)
+        if suppression_reason:
+            return CommentDecision(comment=None, suppressed=True, reason=suppression_reason)
+
+        template = self._template(context)
+        if template is None:
+            return CommentDecision(comment=None, suppressed=True, reason=SUPPRESSION_NO_SIGNAL)
+
+        text, priority, reason = template
+        text = self._trim(text)
+        if self.memory.is_repeated(text):
+            return CommentDecision(comment=None, suppressed=True, reason=SUPPRESSION_REPEATED_COMMENT)
+
+        self.memory.add(text)
+        return CommentDecision(comment=Comment(timestamp=context.timestamp, text=text, priority=priority, reason=reason), suppressed=False, reason=reason)
 
     def generate(self, context: CommentaryContext) -> Comment | None:
-        if context.vad and context.vad.is_speech and (not context.event or context.event.salience < 0.8):
-            return None
-        if context.event and not context.event.should_speak:
-            return None
+        return self.evaluate(context).comment
 
-        emotion = context.emotion.emotion if context.emotion else "calm"
+    def _suppression_reason(self, context: CommentaryContext) -> str | None:
+        if context.event and context.timestamp - context.event.timestamp > self.policy.stale_after_seconds:
+            return SUPPRESSION_STALE_CONTEXT
+        if context.vad and context.vad.is_speech and (not context.event or context.event.salience < self.policy.vad_interrupt_salience):
+            return SUPPRESSION_VAD_SPEECH
+        if context.event and (not context.event.should_speak or context.event.salience < self.policy.min_salience):
+            return SUPPRESSION_LOW_SALIENCE
+        return None
+
+    def _template(self, context: CommentaryContext) -> tuple[str, float, str] | None:
         if context.event:
-            base = self._event_comment(context.event.description, emotion)
+            base = self._event_comment(context)
             priority = context.emotion.speak_priority if context.emotion else context.event.salience
-            reason = context.event.kind
-        elif context.transcript and context.transcript.text:
-            base = f"今の流れ、{context.transcript.text[:20]}が効いてるね"
-            priority = 0.35
-            reason = "transcript"
-        else:
-            return None
+            return base, priority, context.event.kind
 
-        text = self._trim(base)
-        if self.memory.is_repeated(text):
-            return None
-        self.memory.add(text)
-        return Comment(timestamp=context.timestamp, text=text, priority=priority, reason=reason)
+        if context.transcript and context.transcript.text:
+            return f"今の流れ、{context.transcript.text[:20]}が効いてるね", 0.35, "transcript"
 
-    def _event_comment(self, description: str, emotion: str) -> str:
+        return None
+
+    def _event_comment(self, context: CommentaryContext) -> str:
+        assert context.event is not None
+        emotion = context.emotion.emotion if context.emotion else "calm"
+        if context.event.kind == "ui_change":
+            ui_added = context.event.metadata.get("ui_added", [])
+            ui_removed = context.event.metadata.get("ui_removed", [])
+            target = ", ".join((ui_added or ui_removed)[:2]) if isinstance(ui_added or ui_removed, list) else ""
+            return f"UIが動いたね。{target}" if target else "UIが少し変わったね"
+        if context.event.kind == "label_change":
+            added = context.event.metadata.get("added", [])
+            target = ", ".join(added[:2]) if isinstance(added, list) and added else ""
+            return f"画面に{target}が増えたね" if target else "画面の要素が変わったね"
+
         if emotion == "excited":
-            return f"お、今かなり動いたね。{description}"
+            return f"お、今かなり動いたね。{context.event.description}"
         if emotion == "interested":
-            return f"流れが少し変わったね。{description}"
-        return f"ここ、変化があったね。{description}"
+            return f"流れが少し変わったね。{context.event.description}"
+        return f"ここ、変化があったね。{context.event.description}"
 
     def _trim(self, text: str) -> str:
-        return text if len(text) <= self.max_length else text[: self.max_length - 1] + "…"
+        return text if len(text) <= self.policy.max_length else text[: self.policy.max_length - 1] + "…"
 
 
 @dataclass
