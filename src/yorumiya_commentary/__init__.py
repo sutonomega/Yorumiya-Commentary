@@ -1,7 +1,15 @@
 """Yorumiya Commentary core package."""
 
 from .ai import CommentDecision, CommentGenerator, CommentPolicy, CompanionMode, EmotionEstimator, MemoryStore
-from .audio import AudioAnalyzer, TranscriptPolicy, VoiceActivityDetector, VoiceActivityPolicy, WhisperTranscriber
+from .audio import (
+    AudioAnalyzer,
+    AudioEventDetectionPolicy,
+    AudioEventDetector,
+    TranscriptPolicy,
+    VoiceActivityDetector,
+    VoiceActivityPolicy,
+    WhisperTranscriber,
+)
 from .event import EventDetectionConfig, EventDetector
 from .runtime import (
     AudioContextTrace,
@@ -26,6 +34,8 @@ from .voice import FakeVoiceSynthesizer, SpeechStyle, VoicevoxClient, VoicevoxSy
 __all__ = [
     "AudioAnalyzer",
     "AudioContextTrace",
+    "AudioEventDetectionPolicy",
+    "AudioEventDetector",
     "CommentGenerator",
     "CommentDecision",
     "CommentPolicy",
