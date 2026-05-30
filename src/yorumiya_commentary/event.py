@@ -32,7 +32,7 @@ class EventDetector:
                 description=current.summary,
                 salience=max(0.35, min(0.7, current.confidence)),
                 should_speak=True,
-                metadata={"labels": list(current.labels), "ui_elements": list(current.ui_elements)},
+                metadata={"source": "scene", "labels": list(current.labels), "ui_elements": list(current.ui_elements)},
             )
 
         previous_labels = set(self.previous.labels)
@@ -59,6 +59,7 @@ class EventDetector:
             salience=salience,
             should_speak=salience >= self.config.speak_threshold,
             metadata={
+                "source": "scene",
                 "added": added,
                 "removed": removed,
                 "ui_added": ui_added,

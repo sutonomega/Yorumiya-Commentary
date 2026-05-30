@@ -10,6 +10,7 @@
 
 - `timestamp`
 - `event_kind`
+- `event_source`
 - `event_salience`
 - `decision_reason`
 - `suppressed`

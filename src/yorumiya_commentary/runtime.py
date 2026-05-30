@@ -180,6 +180,7 @@ class AudioContextTrace:
 class PipelineTrace:
     timestamp: float
     event_kind: str | None
+    event_source: str | None
     event_salience: float | None
     decision_reason: str
     suppressed: bool
@@ -196,6 +197,7 @@ class PipelineTrace:
         return cls(
             timestamp=result.context.timestamp,
             event_kind=event.kind if event else None,
+            event_source=event.metadata.get("source", "scene") if event else None,
             event_salience=event.salience if event else None,
             decision_reason=result.comment_decision.reason,
             suppressed=result.comment_decision.suppressed,
@@ -211,6 +213,7 @@ class PipelineTrace:
         return {
             "timestamp": self.timestamp,
             "event_kind": self.event_kind,
+            "event_source": self.event_source,
             "event_salience": self.event_salience,
             "decision_reason": self.decision_reason,
             "suppressed": self.suppressed,

@@ -117,7 +117,9 @@ class CorePipelineTest(unittest.TestCase):
         second_event = detector.detect(analyzer.analyze(frames[1]))
 
         self.assertEqual(first_event.kind, "scene_initial")
+        self.assertEqual(first_event.metadata["source"], "scene")
         self.assertEqual(second_event.kind, "ui_change")
+        self.assertEqual(second_event.metadata["source"], "scene")
         self.assertTrue(second_event.should_speak)
         self.assertEqual(second_event.metadata["ui_added"], ["menu", "score"])
 
@@ -328,6 +330,7 @@ class CorePipelineTest(unittest.TestCase):
 
         self.assertEqual(trace.timestamp, 0.0)
         self.assertEqual(trace.event_kind, "scene_initial")
+        self.assertEqual(trace.event_source, "scene")
         self.assertEqual(trace.decision_reason, "scene_initial")
         self.assertFalse(trace.suppressed)
         self.assertTrue(trace.has_comment)
@@ -603,6 +606,19 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(selection.audio_event_kind, "audio_impact")
         self.assertGreater(selection.audio_event_salience, selection.scene_event_salience)
         self.assertEqual(selection.as_dict()["selected_kind"], "audio_impact")
+
+    def test_pipeline_trace_records_event_source(self):
+        frame = next(VideoInput(["quiet field"], fps=1).iter_frames())
+        scene_trace = RealtimePipeline().process_frame_step(frame).to_trace()
+        audio_trace = RealtimePipeline().process_frame_step(
+            frame,
+            audio=AudioChunk(timestamp=0.0, samples=(0.0, 0.9, 0.1), sample_rate=3),
+        ).to_trace()
+
+        self.assertEqual(scene_trace.event_source, "scene")
+        self.assertEqual(scene_trace.as_dict()["event_source"], "scene")
+        self.assertEqual(audio_trace.event_source, "audio")
+        self.assertEqual(audio_trace.as_dict()["event_source"], "audio")
 
     def test_realtime_pipeline_merges_audio_into_context(self):
         frame = next(VideoInput(["battle critical hit"], fps=1).iter_frames())
