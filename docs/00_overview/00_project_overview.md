@@ -2,7 +2,7 @@
 
 Yorumiya Commentary は、動画を一緒に見ている存在として、必要な場面だけ自然に反応する AI commentary system である。
 
-目指すものは、高頻度に喋り続ける実況 AI ではない。画面、音声、会話、場の雰囲気を読み取り、空気を壊さない短い反応を返す companion-like commentary を目指す。
+目指すものは、高頻度に喋り続ける実況 AI ではない。画面、音声、会話、場の雰囲気を読み取り、空気を壊さない短い反応を返す quiet commentary を目指す。
 
 ## Core Idea
 
@@ -37,4 +37,4 @@ Yorumiya Commentary は、動画を一緒に見ている存在として、必要
 
 ## Current Direction
 
-まずは小さく動く pipeline を作る。その後、Whisper、VAD、VOICEVOX、Vision model、Companion mode を段階的に強化する。
+まずは小さく動く pipeline を作る。その後、Whisper、VAD、VOICEVOX、Vision model を段階的に強化する。

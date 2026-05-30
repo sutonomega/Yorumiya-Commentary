@@ -1,4 +1,4 @@
-# Goals
+# Project Goal
 
 Yorumiya Commentary の goal は、動画や配信の空気感を壊さず、自然な存在感を持つ AI commentary を成立させることである。
 

@@ -4,27 +4,25 @@ Yorumiya Commentary の中心概念は Quiet AI である。
 
 Quiet AI は、常に話す AI ではない。状況を見て、必要なら短く反応し、不要なら黙る AI である。
 
-## Commentary Modes
+## MVP Commentary Mode
 
-### Commentary Mode
-
-動画や配信の event に反応する mode。
+動画や配信の event に反応する mode。MVP ではこの mode を主対象にする。
 
 - scene change を見る。
 - salience が高い event だけ拾う。
 - VAD が人声を検出している時は抑制する。
 - short memory で繰り返しを避ける。
 
-### Companion Mode
+## Future Companion Concept
 
-ユーザーとの関係性や記憶を扱う mode。
+将来的には、ユーザーとの関係性や記憶を扱う Companion Mode を追加する。
 
 - ユーザー発話に応答する。
 - long memory を参照する。
 - 実況 mode と共存する。
 - 高頻度雑談ではなく、自然に隣にいる感覚を優先する。
 
-Companion Mode は M5 以降の主題として扱う。現時点では skeleton として存在させる。
+Companion Mode は M5 以降の主題として扱う。MVP では思想上の将来像に留める。
 
 ## Reaction Policy
 
