@@ -14,3 +14,15 @@ scheduler は tick、frame、inference、speech の周期を管理する。`Real
 - `speech_audio`: voice adapter まで実行した場合の音声結果
 
 既存の `process_frame()` は context だけを返す簡易 API として残す。
+
+## Speech Step
+
+`RealtimePipeline.run_speech_step()` は speech queue から次の `SpeechItem` を取り出し、voice adapter に渡す。
+
+戻り値は `SpeechStepResult` である。
+
+- `speech_item`: 処理した発話 item
+- `speech_audio`: voice adapter が返した音声
+- `skipped_reason`: `no_voice_synthesizer` または `no_speech`
+
+これにより、frame 処理と音声化処理を scheduler から別々に呼べる。
