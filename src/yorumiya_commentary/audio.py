@@ -83,6 +83,48 @@ class WhisperTranscriber:
 
 
 @dataclass(frozen=True)
+class TranscriptEventDetectionPolicy:
+    min_confidence: float = 0.65
+    salience_scale: float = 0.6
+    speak_threshold: float = 0.8
+
+    def __post_init__(self) -> None:
+        for name, value in (
+            ("min_confidence", self.min_confidence),
+            ("salience_scale", self.salience_scale),
+            ("speak_threshold", self.speak_threshold),
+        ):
+            if not 0 <= value <= 1:
+                raise ValueError(f"{name} must be between 0 and 1")
+
+
+class TranscriptEventDetector:
+    def __init__(self, policy: TranscriptEventDetectionPolicy | None = None):
+        self.policy = policy or TranscriptEventDetectionPolicy()
+
+    def detect(self, transcript: Transcript | None) -> CommentaryEvent | None:
+        if transcript is None or not transcript.text:
+            return None
+        if transcript.confidence < self.policy.min_confidence:
+            return None
+
+        salience = min(1.0, transcript.confidence * self.policy.salience_scale)
+        return CommentaryEvent(
+            timestamp=transcript.timestamp,
+            kind="transcript_signal",
+            description="Transcript speech detected",
+            salience=salience,
+            should_speak=salience >= self.policy.speak_threshold,
+            metadata={
+                "source": "transcript",
+                "confidence": transcript.confidence,
+                "duration": max(0.0, transcript.end - transcript.start),
+                "text_length": len(transcript.text),
+            },
+        )
+
+
+@dataclass(frozen=True)
 class VoiceActivityPolicy:
     threshold: float = 0.025
     min_speech_ratio: float = 0.12
