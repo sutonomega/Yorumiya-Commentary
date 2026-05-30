@@ -209,6 +209,25 @@ class CorePipelineTest(unittest.TestCase):
         self.assertTrue(audio.audio.startswith(b"FAKE-WAV:"))
         self.assertEqual(fake_voice.items[0].text, audio.text)
 
+    def test_run_speech_step_reports_skip_reasons(self):
+        pipeline_without_voice = RealtimePipeline()
+        self.assertEqual(pipeline_without_voice.run_speech_step().skipped_reason, "no_voice_synthesizer")
+
+        pipeline_with_voice = RealtimePipeline(voice_synthesizer=FakeVoiceSynthesizer())
+        self.assertEqual(pipeline_with_voice.run_speech_step().skipped_reason, "no_speech")
+
+    def test_run_speech_step_synthesizes_queued_item(self):
+        fake_voice = FakeVoiceSynthesizer()
+        pipeline = RealtimePipeline(voice_synthesizer=fake_voice)
+        pipeline.queue.put_speech(SpeechItem(timestamp=2.0, text="hello"))
+
+        result = pipeline.run_speech_step(now=2.0)
+
+        self.assertTrue(result.synthesized)
+        self.assertEqual(result.speech_item.text, "hello")
+        self.assertEqual(result.speech_audio.text, "hello")
+        self.assertEqual(pipeline.queue.state()["speech"], 0)
+
     def test_process_frame_step_exposes_decision_speech_and_audio(self):
         frame = next(
             VideoInput(

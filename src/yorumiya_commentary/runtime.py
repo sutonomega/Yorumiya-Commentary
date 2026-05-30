@@ -111,6 +111,17 @@ class PipelineTrace:
         }
 
 
+@dataclass(frozen=True)
+class SpeechStepResult:
+    speech_item: SpeechItem | None = None
+    speech_audio: SpeechAudio | None = None
+    skipped_reason: str | None = None
+
+    @property
+    def synthesized(self) -> bool:
+        return self.speech_audio is not None
+
+
 @dataclass
 class RealtimeScheduler:
     tick_interval: float = 0.2
@@ -168,7 +179,7 @@ class RealtimePipeline:
             speech_item = comment_to_speech_item(decision.comment, self.speech_style)
             self.queue.put_speech(speech_item)
 
-        speech_audio = self.synthesize_next_speech(now=frame.timestamp) if synthesize else None
+        speech_audio = self.run_speech_step(now=frame.timestamp).speech_audio if synthesize else None
         return PipelineStepResult(
             context=context,
             comment_decision=decision,
@@ -216,9 +227,12 @@ class RealtimePipeline:
         return context
 
     def synthesize_next_speech(self, now: float | None = None) -> SpeechAudio | None:
+        return self.run_speech_step(now=now).speech_audio
+
+    def run_speech_step(self, now: float | None = None) -> SpeechStepResult:
         if self.voice_synthesizer is None:
-            return None
+            return SpeechStepResult(skipped_reason="no_voice_synthesizer")
         speech = self.queue.get_speech(now=now)
         if speech is None:
-            return None
-        return self.voice_synthesizer.synthesize(speech)
+            return SpeechStepResult(skipped_reason="no_speech")
+        return SpeechStepResult(speech_item=speech, speech_audio=self.voice_synthesizer.synthesize(speech))
