@@ -13,6 +13,7 @@ from yorumiya_commentary import (
     FrameSampler,
     FrameSamplingPolicy,
     RealtimePipeline,
+    RealtimeScheduler,
     SceneAnalyzer,
     SpeechQueuePolicy,
     SpeechStyle,
@@ -304,6 +305,41 @@ class CorePipelineTest(unittest.TestCase):
         self.assertTrue(trace.suppressed)
         self.assertFalse(trace.has_speech_item)
         self.assertEqual(trace.queue_speech_count, 0)
+
+    def test_run_due_steps_separates_frame_and_speech_intervals(self):
+        frame = next(
+            VideoInput(
+                [
+                    {
+                        "summary": "menu opened",
+                        "labels": ["menu", "score"],
+                        "ui_elements": ["menu", "score"],
+                        "confidence": 0.8,
+                    }
+                ],
+                fps=1,
+            ).iter_frames()
+        )
+        scheduler = RealtimeScheduler(frame_interval=1.0, speech_interval=0.5)
+        pipeline = RealtimePipeline(voice_synthesizer=FakeVoiceSynthesizer())
+
+        first = pipeline.run_due_steps(scheduler, frame=frame, now=0.0)
+        self.assertTrue(first.frame_due)
+        self.assertTrue(first.speech_due)
+        self.assertIsNotNone(first.frame_step)
+        self.assertTrue(first.speech_step.synthesized)
+        self.assertEqual(len(first.traces), 1)
+
+        quiet = pipeline.run_due_steps(scheduler, frame=frame, now=0.25)
+        self.assertFalse(quiet.frame_due)
+        self.assertFalse(quiet.speech_due)
+        self.assertIsNone(quiet.frame_step)
+        self.assertIsNone(quiet.speech_step)
+
+        speech_only = pipeline.run_due_steps(scheduler, frame=frame, now=0.6)
+        self.assertFalse(speech_only.frame_due)
+        self.assertTrue(speech_only.speech_due)
+        self.assertEqual(speech_only.speech_step.skipped_reason, "no_speech")
 
     def test_audio_analyzer_and_vad_produce_timestamped_results(self):
         chunk = AudioChunk(timestamp=12.0, samples=(0.0, 0.1, 0.2, 0.0, 0.4), sample_rate=5)

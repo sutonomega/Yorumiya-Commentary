@@ -26,3 +26,15 @@ scheduler は tick、frame、inference、speech の周期を管理する。`Real
 - `skipped_reason`: `no_voice_synthesizer` または `no_speech`
 
 これにより、frame 処理と音声化処理を scheduler から別々に呼べる。
+
+## Due Steps
+
+`RealtimePipeline.run_due_steps()` は `RealtimeScheduler` の interval 判定を使い、必要な step だけを実行する。
+
+- frame が due で `frame` が渡されている場合: `process_frame_step()` を実行する。
+- speech が due の場合: `run_speech_step()` を実行する。
+- どちらも due でなければ何も実行しない。
+
+戻り値は `RuntimeTickResult` で、`frame_due`、`speech_due`、`frame_step`、`speech_step` を確認できる。
+
+これは本格的な realtime loop ではなく、M3 で loop を組むための小さな bridge である。
