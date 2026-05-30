@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 
 from yorumiya_commentary import (
     AudioAnalyzer,
+    AudioContextTrace,
     CommentGenerator,
     CommentPolicy,
     CompanionMode,
@@ -24,9 +25,10 @@ from yorumiya_commentary import (
     TaskQueue,
     VideoInput,
     VoiceActivityDetector,
+    WhisperTranscriber,
     comment_to_speech_item,
 )
-from yorumiya_commentary.models import AudioChunk, Comment, CommentaryContext, CommentaryEvent, SpeechItem, VadResult
+from yorumiya_commentary.models import AudioChunk, Comment, CommentaryContext, CommentaryEvent, SpeechItem, Transcript, VadResult
 
 
 class CorePipelineTest(unittest.TestCase):
@@ -452,6 +454,32 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(rows[0]["frame_trace"]["event_kind"], "scene_initial")
         self.assertTrue(rows[0]["speech_trace"]["synthesized"])
         self.assertEqual(rows[1]["speech_trace"]["skipped_reason"], "no_speech")
+
+    def test_audio_context_trace_records_audio_vad_and_transcript_state(self):
+        frame = next(VideoInput(["battle critical hit"], fps=1).iter_frames())
+        chunk = AudioChunk(timestamp=0.0, samples=(0.0, 0.4, 0.5, 0.2), sample_rate=4)
+        transcriber = WhisperTranscriber(
+            adapter=lambda audio: Transcript(
+                timestamp=audio.timestamp,
+                text="user speaking",
+                start=audio.timestamp,
+                end=audio.timestamp + 1.0,
+                confidence=0.9,
+            )
+        )
+
+        result = RealtimePipeline(transcriber=transcriber).process_frame_step(frame, audio=chunk)
+        audio_trace = result.to_trace().audio_trace
+
+        self.assertIsInstance(audio_trace, AudioContextTrace)
+        self.assertTrue(audio_trace.has_audio)
+        self.assertEqual(audio_trace.audio_loudness, "loud")
+        self.assertEqual(audio_trace.audio_atmosphere, "excited")
+        self.assertTrue(audio_trace.vad_is_speech)
+        self.assertGreater(audio_trace.vad_speech_ratio, 0.0)
+        self.assertTrue(audio_trace.has_transcript)
+        self.assertEqual(audio_trace.transcript_confidence, 0.9)
+        self.assertNotIn("transcript_text", audio_trace.as_dict())
 
     def test_audio_analyzer_and_vad_produce_timestamped_results(self):
         chunk = AudioChunk(timestamp=12.0, samples=(0.0, 0.1, 0.2, 0.0, 0.4), sample_rate=5)

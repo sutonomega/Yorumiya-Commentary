@@ -4,6 +4,7 @@ from .ai import CommentDecision, CommentGenerator, CommentPolicy, CompanionMode,
 from .audio import AudioAnalyzer, VoiceActivityDetector, WhisperTranscriber
 from .event import EventDetectionConfig, EventDetector
 from .runtime import (
+    AudioContextTrace,
     PipelineStepResult,
     PipelineTrace,
     RealtimeLoop,
@@ -24,6 +25,7 @@ from .voice import FakeVoiceSynthesizer, SpeechStyle, VoicevoxClient, VoicevoxSy
 
 __all__ = [
     "AudioAnalyzer",
+    "AudioContextTrace",
     "CommentGenerator",
     "CommentDecision",
     "CommentPolicy",
