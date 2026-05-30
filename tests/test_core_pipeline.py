@@ -23,6 +23,7 @@ from yorumiya_commentary import (
     SpeechQueuePolicy,
     SpeechStyle,
     TaskQueue,
+    TranscriptPolicy,
     VideoInput,
     VoiceActivityDetector,
     VoiceActivityPolicy,
@@ -498,6 +499,29 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(speech.reason, "speech_detected")
         self.assertEqual(silent.reason, "silent")
         self.assertEqual(inactive.reason, "no_active_samples")
+
+    def test_whisper_transcriber_normalizes_adapter_payloads(self):
+        chunk = AudioChunk(timestamp=10.0, samples=(0.0, 0.1, 0.2, 0.3), sample_rate=2)
+
+        text_transcript = WhisperTranscriber(adapter=lambda audio: " hello ").transcribe(chunk)
+        dict_transcript = WhisperTranscriber(
+            adapter=lambda audio: {"text": "dict text", "start": 9.0, "end": 8.0, "confidence": 1.5}
+        ).transcribe(chunk)
+        empty_transcript = WhisperTranscriber(adapter=lambda audio: None).transcribe(chunk)
+        policy_transcript = WhisperTranscriber(
+            adapter=lambda audio: "",
+            policy=TranscriptPolicy(fallback_confidence=0.2, string_confidence=0.8),
+        ).transcribe(chunk)
+
+        self.assertEqual(text_transcript.text, "hello")
+        self.assertEqual(text_transcript.confidence, 0.5)
+        self.assertEqual(dict_transcript.text, "dict text")
+        self.assertEqual(dict_transcript.start, 9.0)
+        self.assertEqual(dict_transcript.end, 9.0)
+        self.assertEqual(dict_transcript.confidence, 1.0)
+        self.assertEqual(empty_transcript.text, "")
+        self.assertEqual(empty_transcript.confidence, 0.0)
+        self.assertEqual(policy_transcript.confidence, 0.2)
 
     def test_audio_analyzer_and_vad_produce_timestamped_results(self):
         chunk = AudioChunk(timestamp=12.0, samples=(0.0, 0.1, 0.2, 0.0, 0.4), sample_rate=5)

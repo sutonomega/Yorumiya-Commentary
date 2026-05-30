@@ -17,6 +17,19 @@ audio analyzer は rms、peak、loudness、atmosphere、event を出力する。
 - `no_active_samples`: active sample がない。
 - `silent`: sample がない。
 
+## Transcript Adapter
+
+`WhisperTranscriber` は external adapter の返り値を `Transcript` に正規化する。
+
+adapter が返せるもの:
+
+- `Transcript`: そのまま受け取り、text trim、confidence clamp、time range 補正を行う。
+- `dict`: `text`、`timestamp`、`start`、`end`、`confidence` を読み取る。
+- `str`: text として扱い、`TranscriptPolicy.string_confidence` を使う。
+- `None`: 空 transcript として扱う。
+
+`TranscriptPolicy` は fallback confidence を管理する。実 Whisper adapter は raw payload を core に漏らさず、この境界で `Transcript` に変換する。
+
 ## Runtime Trace
 
 `AudioContextTrace` は runtime の `PipelineTrace` に含まれる audio 観測データである。

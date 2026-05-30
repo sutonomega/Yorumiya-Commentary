@@ -3,23 +3,82 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from math import sqrt
+from typing import Any
 
 from .models import AudioChunk, AudioFeatures, Transcript, VadResult
 
 
+TranscriptAdapterPayload = Transcript | dict[str, Any] | str | None
+
+
+@dataclass(frozen=True)
+class TranscriptPolicy:
+    fallback_confidence: float = 0.0
+    string_confidence: float = 0.5
+
+    def __post_init__(self) -> None:
+        if not 0 <= self.fallback_confidence <= 1:
+            raise ValueError("fallback_confidence must be between 0 and 1")
+        if not 0 <= self.string_confidence <= 1:
+            raise ValueError("string_confidence must be between 0 and 1")
+
+
 class WhisperTranscriber:
-    def __init__(self, adapter: Callable[[AudioChunk], Transcript] | None = None):
+    def __init__(self, adapter: Callable[[AudioChunk], TranscriptAdapterPayload] | None = None, policy: TranscriptPolicy | None = None):
         self.adapter = adapter
+        self.policy = policy or TranscriptPolicy()
 
     def transcribe(self, chunk: AudioChunk) -> Transcript:
         if self.adapter:
-            return self.adapter(chunk)
+            return self.normalize(self.adapter(chunk), chunk)
+        return self.empty_transcript(chunk)
+
+    def empty_transcript(self, chunk: AudioChunk) -> Transcript:
         return Transcript(
             timestamp=chunk.timestamp,
             text="",
             start=chunk.timestamp,
             end=chunk.timestamp + len(chunk.samples) / max(chunk.sample_rate, 1),
             confidence=0.0,
+        )
+
+    def normalize(self, payload: TranscriptAdapterPayload, chunk: AudioChunk) -> Transcript:
+        if payload is None:
+            return self.empty_transcript(chunk)
+        if isinstance(payload, Transcript):
+            return self._normalize_transcript(payload)
+        if isinstance(payload, str):
+            return self._normalize_transcript(
+                Transcript(
+                    timestamp=chunk.timestamp,
+                    text=payload,
+                    start=chunk.timestamp,
+                    end=chunk.timestamp + len(chunk.samples) / max(chunk.sample_rate, 1),
+                    confidence=self.policy.string_confidence if payload else self.policy.fallback_confidence,
+                )
+            )
+        if isinstance(payload, dict):
+            return self._normalize_transcript(
+                Transcript(
+                    timestamp=float(payload.get("timestamp", chunk.timestamp)),
+                    text=str(payload.get("text", "")),
+                    start=float(payload.get("start", chunk.timestamp)),
+                    end=float(payload.get("end", chunk.timestamp + len(chunk.samples) / max(chunk.sample_rate, 1))),
+                    confidence=float(payload.get("confidence", self.policy.fallback_confidence)),
+                )
+            )
+        raise TypeError("Transcript adapter must return Transcript, dict, str, or None")
+
+    def _normalize_transcript(self, transcript: Transcript) -> Transcript:
+        start = max(0.0, transcript.start)
+        end = max(start, transcript.end)
+        confidence = min(1.0, max(0.0, transcript.confidence))
+        return Transcript(
+            timestamp=transcript.timestamp,
+            text=transcript.text.strip(),
+            start=start,
+            end=end,
+            confidence=confidence,
         )
 
 
