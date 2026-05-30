@@ -153,6 +153,13 @@ class CorePipelineTest(unittest.TestCase):
         )
         self.assertEqual(generator.evaluate(speech_context).reason, "vad_speech")
 
+        transcript_context = CommentaryContext(
+            timestamp=10.0,
+            event=CommentaryEvent(timestamp=10.0, kind="label_change", description="change", salience=0.6, should_speak=True),
+            transcript=Transcript(timestamp=10.0, text="user comment", start=10.0, end=11.0, confidence=0.9),
+        )
+        self.assertEqual(generator.evaluate(transcript_context).reason, "transcript_speech")
+
         stale_context = CommentaryContext(
             timestamp=12.5,
             event=CommentaryEvent(timestamp=10.0, kind="label_change", description="old change", salience=0.9, should_speak=True),
@@ -176,6 +183,31 @@ class CorePipelineTest(unittest.TestCase):
 
         self.assertFalse(first.suppressed)
         self.assertEqual(second.reason, "repeated_comment")
+
+    def test_comment_generator_allows_low_confidence_transcript_and_high_salience_event(self):
+        generator = CommentGenerator(
+            policy=CommentPolicy(
+                transcript_interrupt_confidence=0.7,
+                transcript_interrupt_salience=0.8,
+            )
+        )
+        event = CommentaryEvent(timestamp=1.0, kind="label_change", description="battle appears", salience=0.9, should_speak=True)
+        high_salience_context = CommentaryContext(
+            timestamp=1.0,
+            event=event,
+            transcript=Transcript(timestamp=1.0, text="user speaking", start=1.0, end=2.0, confidence=0.95),
+        )
+        low_confidence_context = CommentaryContext(
+            timestamp=2.0,
+            event=CommentaryEvent(timestamp=2.0, kind="label_change", description="menu appears", salience=0.7, should_speak=True),
+            transcript=Transcript(timestamp=2.0, text="maybe speech", start=2.0, end=3.0, confidence=0.4),
+        )
+
+        self.assertFalse(generator.evaluate(high_salience_context).suppressed)
+        low_confidence_decision = CommentGenerator(
+            policy=CommentPolicy(transcript_interrupt_confidence=0.7)
+        ).evaluate(low_confidence_context)
+        self.assertFalse(low_confidence_decision.suppressed)
 
     def test_comment_to_speech_item_applies_style(self):
         comment = Comment(timestamp=3.0, text="UIが動いたね", priority=0.8, reason="ui_change")
