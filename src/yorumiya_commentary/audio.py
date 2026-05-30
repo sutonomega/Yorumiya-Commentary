@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from math import sqrt
 
 from .models import AudioChunk, AudioFeatures, Transcript, VadResult
@@ -22,22 +23,43 @@ class WhisperTranscriber:
         )
 
 
+@dataclass(frozen=True)
+class VoiceActivityPolicy:
+    threshold: float = 0.025
+    min_speech_ratio: float = 0.12
+    min_active_samples: int = 1
+
+    def __post_init__(self) -> None:
+        if self.threshold < 0:
+            raise ValueError("threshold must be non-negative")
+        if not 0 <= self.min_speech_ratio <= 1:
+            raise ValueError("min_speech_ratio must be between 0 and 1")
+        if self.min_active_samples < 0:
+            raise ValueError("min_active_samples must be non-negative")
+
+
 class VoiceActivityDetector:
-    def __init__(self, threshold: float = 0.025):
-        self.threshold = threshold
+    def __init__(self, threshold: float | None = None, policy: VoiceActivityPolicy | None = None):
+        if policy and threshold is not None:
+            raise ValueError("Specify either threshold or policy, not both")
+        self.policy = policy or VoiceActivityPolicy(threshold=threshold if threshold is not None else 0.025)
 
     def detect(self, chunk: AudioChunk) -> VadResult:
         if not chunk.samples:
-            return VadResult(timestamp=chunk.timestamp, is_speech=False, speech_ratio=0.0)
-        active = sum(1 for sample in chunk.samples if abs(sample) >= self.threshold)
+            return VadResult(timestamp=chunk.timestamp, is_speech=False, speech_ratio=0.0, reason="silent")
+        active = sum(1 for sample in chunk.samples if abs(sample) >= self.policy.threshold)
         ratio = active / len(chunk.samples)
         duration = len(chunk.samples) / max(chunk.sample_rate, 1)
+        is_speech = ratio >= self.policy.min_speech_ratio and active >= self.policy.min_active_samples
+        reason = "speech_detected" if is_speech else "no_active_samples" if active == 0 else "low_activity"
         return VadResult(
             timestamp=chunk.timestamp,
-            is_speech=ratio >= 0.12,
+            is_speech=is_speech,
             speech_ratio=ratio,
-            start=chunk.timestamp if ratio else None,
-            end=chunk.timestamp + duration if ratio else None,
+            start=chunk.timestamp if active else None,
+            end=chunk.timestamp + duration if active else None,
+            reason=reason,
+            active_samples=active,
         )
 
 

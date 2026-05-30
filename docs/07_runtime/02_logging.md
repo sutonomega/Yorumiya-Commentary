@@ -34,6 +34,8 @@
 - `audio_peak`
 - `vad_is_speech`
 - `vad_speech_ratio`
+- `vad_reason`
+- `vad_active_samples`
 - `has_transcript`
 - `transcript_confidence`
 
