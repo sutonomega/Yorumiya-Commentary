@@ -13,6 +13,7 @@ from .audio import (
 from .event import EventDetectionConfig, EventDetector
 from .runtime import (
     AudioContextTrace,
+    EventSelectionTrace,
     PipelineStepResult,
     PipelineTrace,
     RealtimeLoop,
@@ -43,6 +44,7 @@ __all__ = [
     "EmotionEstimator",
     "EventDetectionConfig",
     "EventDetector",
+    "EventSelectionTrace",
     "FrameFileInput",
     "FrameSampler",
     "FrameSamplingPolicy",
