@@ -30,6 +30,16 @@ adapter が返せるもの:
 
 `TranscriptPolicy` は fallback confidence を管理する。実 Whisper adapter は raw payload を core に漏らさず、この境界で `Transcript` に変換する。
 
+## Transcript Event Detection
+
+`TranscriptEventDetector` は high-confidence な `Transcript` から transcript 由来の `CommentaryEvent` を作る。
+
+- `transcript_signal`: transcript text があり、confidence が `TranscriptEventDetectionPolicy.min_confidence` 以上の時に作る。
+
+metadata には `source="transcript"`、confidence、duration、text length を入れる。raw transcript text は event metadata に保存しない。
+
+transcript event は人の発話を観測可能にするための signal であり、通常は `CommentGenerator` 側の `transcript_speech` suppression によって Quiet AI の抑制理由として扱われる。
+
 ## Runtime Trace
 
 `AudioContextTrace` は runtime の `PipelineTrace` に含まれる audio 観測データである。
@@ -49,3 +59,5 @@ adapter が返せるもの:
 - `audio_active`: `atmosphere == "active"` の時に作る。
 
 `RealtimePipeline` は scene event と audio event の salience を比較し、高い方を `CommentaryContext.event` に採用する。これにより、画面変化が小さくても大きな効果音や盛り上がりを commentary の判断材料にできる。
+
+transcript event も同じ選択候補に入る。これにより、VAD だけでは説明しづらい発話由来の抑制も `EventSelectionTrace` と `PipelineTrace.event_source` から確認できる。

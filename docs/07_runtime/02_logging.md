@@ -23,7 +23,7 @@
 
 ## Event Selection Trace
 
-`EventSelectionTrace` は scene event と audio event のどちらを `CommentaryContext.event` に採用したかを記録する。
+`EventSelectionTrace` は scene event、audio event、transcript event のどれを `CommentaryContext.event` に採用したかを記録する。
 
 記録するもの:
 
@@ -34,8 +34,10 @@
 - `scene_event_salience`
 - `audio_event_kind`
 - `audio_event_salience`
+- `transcript_event_kind`
+- `transcript_event_salience`
 
-`reason` は `scene_only`、`audio_only`、`audio_higher_salience`、`scene_higher_or_equal_salience`、`no_event` のいずれかである。
+`reason` は `scene_only`、`audio_only`、`transcript_only`、`audio_higher_salience`、`transcript_higher_salience`、`scene_higher_or_equal_salience`、`no_event` のいずれかである。
 
 ## Audio Context Trace
 

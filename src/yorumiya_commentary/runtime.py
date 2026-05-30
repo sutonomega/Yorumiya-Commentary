@@ -8,7 +8,7 @@ from time import monotonic
 from typing import Any
 
 from .ai import CommentDecision, CommentGenerator, EmotionEstimator
-from .audio import AudioAnalyzer, AudioEventDetector, VoiceActivityDetector, WhisperTranscriber
+from .audio import AudioAnalyzer, AudioEventDetector, TranscriptEventDetector, VoiceActivityDetector, WhisperTranscriber
 from .event import EventDetector
 from .models import AudioChunk, CommentaryContext, CommentaryEvent, Frame, SpeechAudio, SpeechItem
 from .scene import SceneAnalyzer
@@ -81,6 +81,8 @@ class EventSelectionTrace:
     scene_event_salience: float | None = None
     audio_event_kind: str | None = None
     audio_event_salience: float | None = None
+    transcript_event_kind: str | None = None
+    transcript_event_salience: float | None = None
 
     @classmethod
     def from_events(
@@ -88,25 +90,32 @@ class EventSelectionTrace:
         scene_event: CommentaryEvent | None,
         audio_event: CommentaryEvent | None,
         selected: CommentaryEvent | None,
+        transcript_event: CommentaryEvent | None = None,
     ) -> "EventSelectionTrace":
-        if scene_event is None and audio_event is None:
+        events = {"scene": scene_event, "audio": audio_event, "transcript": transcript_event}
+        present_sources = [source for source, event in events.items() if event is not None]
+        selected_source = selected.metadata.get("source", "scene") if selected else None
+
+        if not present_sources:
             reason = "no_event"
-        elif scene_event is None:
-            reason = "audio_only"
-        elif audio_event is None:
-            reason = "scene_only"
-        elif selected is audio_event:
+        elif len(present_sources) == 1:
+            reason = f"{present_sources[0]}_only"
+        elif selected_source == "audio":
             reason = "audio_higher_salience"
+        elif selected_source == "transcript":
+            reason = "transcript_higher_salience"
         else:
             reason = "scene_higher_or_equal_salience"
         return cls(
             selected_kind=selected.kind if selected else None,
-            selected_source=selected.metadata.get("source", "scene") if selected else None,
+            selected_source=selected_source,
             reason=reason,
             scene_event_kind=scene_event.kind if scene_event else None,
             scene_event_salience=scene_event.salience if scene_event else None,
             audio_event_kind=audio_event.kind if audio_event else None,
             audio_event_salience=audio_event.salience if audio_event else None,
+            transcript_event_kind=transcript_event.kind if transcript_event else None,
+            transcript_event_salience=transcript_event.salience if transcript_event else None,
         )
 
     def as_dict(self) -> dict[str, object]:
@@ -118,6 +127,8 @@ class EventSelectionTrace:
             "scene_event_salience": self.scene_event_salience,
             "audio_event_kind": self.audio_event_kind,
             "audio_event_salience": self.audio_event_salience,
+            "transcript_event_kind": self.transcript_event_kind,
+            "transcript_event_salience": self.transcript_event_salience,
         }
 
 
@@ -373,6 +384,7 @@ class RealtimePipeline:
         comment_generator: CommentGenerator | None = None,
         audio_analyzer: AudioAnalyzer | None = None,
         audio_event_detector: AudioEventDetector | None = None,
+        transcript_event_detector: TranscriptEventDetector | None = None,
         vad: VoiceActivityDetector | None = None,
         transcriber: WhisperTranscriber | None = None,
         queue: TaskQueue | None = None,
@@ -385,6 +397,7 @@ class RealtimePipeline:
         self.comment_generator = comment_generator or CommentGenerator()
         self.audio_analyzer = audio_analyzer or AudioAnalyzer()
         self.audio_event_detector = audio_event_detector or AudioEventDetector()
+        self.transcript_event_detector = transcript_event_detector or TranscriptEventDetector()
         self.vad = vad or VoiceActivityDetector()
         self.transcriber = transcriber or WhisperTranscriber()
         self.queue = queue or TaskQueue()
@@ -452,10 +465,11 @@ class RealtimePipeline:
         scene_event = self.event_detector.detect(scene)
         audio_features = self.audio_analyzer.analyze(audio) if audio else None
         audio_event = self.audio_event_detector.detect(audio_features)
-        event = self._select_event(scene_event, audio_event)
-        event_selection = EventSelectionTrace.from_events(scene_event, audio_event, event)
         vad_result = self.vad.detect(audio) if audio else None
         transcript = self.transcriber.transcribe(audio) if audio else None
+        transcript_event = self.transcript_event_detector.detect(transcript)
+        event = self._select_event(scene_event, audio_event, transcript_event)
+        event_selection = EventSelectionTrace.from_events(scene_event, audio_event, event, transcript_event)
         context = CommentaryContext(
             timestamp=frame.timestamp,
             scene=scene,
@@ -482,12 +496,13 @@ class RealtimePipeline:
         self,
         scene_event: CommentaryEvent | None,
         audio_event: CommentaryEvent | None,
+        transcript_event: CommentaryEvent | None = None,
     ) -> CommentaryEvent | None:
-        if scene_event is None:
-            return audio_event
-        if audio_event is None:
-            return scene_event
-        return audio_event if audio_event.salience > scene_event.salience else scene_event
+        selected = scene_event or audio_event or transcript_event
+        for event in (audio_event, transcript_event):
+            if event is not None and (selected is None or event.salience > selected.salience):
+                selected = event
+        return selected
 
     def run_once(self, frame: Frame, on_speech: Callable[[SpeechItem], None] | None = None) -> CommentaryContext:
         context = self.process_frame(frame)

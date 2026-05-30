@@ -25,6 +25,7 @@ from yorumiya_commentary import (
     SpeechQueuePolicy,
     SpeechStyle,
     TaskQueue,
+    TranscriptEventDetector,
     TranscriptPolicy,
     VideoInput,
     VoiceActivityDetector,
@@ -581,6 +582,18 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(event.metadata["source"], "audio")
         self.assertEqual(event.metadata["audio_event"], "impact")
 
+    def test_transcript_event_detector_creates_commentary_event_without_raw_text(self):
+        transcript = Transcript(timestamp=4.0, text="boss is coming", start=4.0, end=5.25, confidence=0.9)
+
+        event = TranscriptEventDetector().detect(transcript)
+
+        self.assertEqual(event.kind, "transcript_signal")
+        self.assertEqual(event.metadata["source"], "transcript")
+        self.assertEqual(event.metadata["confidence"], 0.9)
+        self.assertEqual(event.metadata["text_length"], len("boss is coming"))
+        self.assertNotIn("text", event.metadata)
+        self.assertFalse(event.should_speak)
+
     def test_realtime_pipeline_uses_audio_event_when_more_salient_than_scene_event(self):
         frame = next(VideoInput(["quiet field"], fps=1).iter_frames())
         chunk = AudioChunk(timestamp=0.0, samples=(0.0, 0.9, 0.1), sample_rate=3)
@@ -619,6 +632,41 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(scene_trace.as_dict()["event_source"], "scene")
         self.assertEqual(audio_trace.event_source, "audio")
         self.assertEqual(audio_trace.as_dict()["event_source"], "audio")
+
+    def test_realtime_pipeline_records_transcript_event_selection(self):
+        frame = next(
+            VideoInput(
+                [
+                    {
+                        "summary": "quiet field",
+                        "labels": ["field"],
+                        "confidence": 0.1,
+                    }
+                ],
+                fps=1,
+            ).iter_frames()
+        )
+        chunk = AudioChunk(timestamp=0.0, samples=(0.0, 0.01, 0.0), sample_rate=3)
+        transcriber = WhisperTranscriber(
+            adapter=lambda audio: Transcript(
+                timestamp=audio.timestamp,
+                text="player speaking",
+                start=audio.timestamp,
+                end=audio.timestamp + 1.0,
+                confidence=0.95,
+            )
+        )
+
+        trace = RealtimePipeline(transcriber=transcriber).process_frame_step(frame, audio=chunk).to_trace()
+
+        self.assertEqual(trace.event_kind, "transcript_signal")
+        self.assertEqual(trace.event_source, "transcript")
+        self.assertEqual(trace.decision_reason, "transcript_speech")
+        self.assertTrue(trace.suppressed)
+        self.assertEqual(trace.event_selection.selected_source, "transcript")
+        self.assertEqual(trace.event_selection.reason, "transcript_higher_salience")
+        self.assertEqual(trace.event_selection.transcript_event_kind, "transcript_signal")
+        self.assertEqual(trace.as_dict()["event_selection"]["transcript_event_kind"], "transcript_signal")
 
     def test_realtime_pipeline_merges_audio_into_context(self):
         frame = next(VideoInput(["battle critical hit"], fps=1).iter_frames())
