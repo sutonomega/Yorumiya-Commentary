@@ -18,11 +18,41 @@
 - `has_speech_audio`
 - `queue_speech_count`
 
+## Speech Trace
+
+`SpeechTrace` は `SpeechStepResult` から作る音声処理用の trace である。
+
+記録するもの:
+
+- `timestamp`
+- `synthesized`
+- `skipped_reason`
+- `has_speech_item`
+- `has_speech_audio`
+- `speech_timestamp`
+- `audio_format`
+
+## Runtime Tick Trace
+
+`RuntimeTickTrace` は 1 tick 全体の観測結果である。
+
+記録するもの:
+
+- `timestamp`
+- `frame_due`
+- `speech_due`
+- `frame_trace`
+- `speech_trace`
+
+`frame_trace` は frame step が実行された場合だけ入る。`speech_trace` は speech step が実行された場合だけ入る。
+
 ## Usage
 
 `PipelineStepResult.to_trace()` で step result から trace を作れる。
 
 `RealtimePipeline.trace_step()` は `process_frame_step()` を実行し、queue state を含む trace を返す。
+
+`RuntimeTickResult.to_trace()` は `RuntimeTickResult` から `RuntimeTickTrace` を作る。
 
 これにより、MVP では次を外部 logging library なしで確認できる。
 
@@ -30,3 +60,4 @@
 - なぜ黙ったか。
 - speech queue に入ったか。
 - voice adapter まで到達したか。
+- tick ごとに frame / speech のどちらが動いたか。

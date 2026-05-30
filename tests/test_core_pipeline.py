@@ -379,6 +379,48 @@ class CorePipelineTest(unittest.TestCase):
         self.assertTrue(results[2].speech_due)
         self.assertEqual(results[2].speech_step.skipped_reason, "no_speech")
 
+    def test_runtime_tick_result_creates_frame_and_speech_trace(self):
+        frame = next(
+            VideoInput(
+                [
+                    {
+                        "summary": "menu opened",
+                        "labels": ["menu", "score"],
+                        "ui_elements": ["menu", "score"],
+                        "confidence": 0.8,
+                    }
+                ],
+                fps=1,
+            ).iter_frames()
+        )
+        loop = RealtimeLoop(
+            pipeline=RealtimePipeline(voice_synthesizer=FakeVoiceSynthesizer()),
+            scheduler=RealtimeScheduler(frame_interval=1.0, speech_interval=0.5),
+        )
+
+        trace = loop.step(RuntimeTick(timestamp=0.0, frame=frame)).to_trace()
+
+        self.assertTrue(trace.frame_due)
+        self.assertTrue(trace.speech_due)
+        self.assertEqual(trace.frame_trace.event_kind, "scene_initial")
+        self.assertTrue(trace.speech_trace.synthesized)
+        self.assertEqual(trace.speech_trace.audio_format, "fake-wav")
+        self.assertTrue(trace.as_dict()["speech_trace"]["has_speech_audio"])
+
+    def test_runtime_tick_trace_records_speech_skip_without_frame(self):
+        loop = RealtimeLoop(
+            pipeline=RealtimePipeline(voice_synthesizer=FakeVoiceSynthesizer()),
+            scheduler=RealtimeScheduler(frame_interval=1.0, speech_interval=0.5),
+        )
+        loop.step(RuntimeTick(timestamp=0.0))
+
+        trace = loop.step(RuntimeTick(timestamp=0.5)).to_trace()
+
+        self.assertFalse(trace.frame_due)
+        self.assertTrue(trace.speech_due)
+        self.assertIsNone(trace.frame_trace)
+        self.assertEqual(trace.speech_trace.skipped_reason, "no_speech")
+
     def test_audio_analyzer_and_vad_produce_timestamped_results(self):
         chunk = AudioChunk(timestamp=12.0, samples=(0.0, 0.1, 0.2, 0.0, 0.4), sample_rate=5)
 
