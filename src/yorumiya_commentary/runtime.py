@@ -8,9 +8,9 @@ from time import monotonic
 from typing import Any
 
 from .ai import CommentDecision, CommentGenerator, EmotionEstimator
-from .audio import AudioAnalyzer, VoiceActivityDetector, WhisperTranscriber
+from .audio import AudioAnalyzer, AudioEventDetector, VoiceActivityDetector, WhisperTranscriber
 from .event import EventDetector
-from .models import AudioChunk, CommentaryContext, Frame, SpeechAudio, SpeechItem
+from .models import AudioChunk, CommentaryContext, CommentaryEvent, Frame, SpeechAudio, SpeechItem
 from .scene import SceneAnalyzer
 from .voice import SpeechStyle, SpeechSynthesizer, comment_to_speech_item
 
@@ -316,6 +316,7 @@ class RealtimePipeline:
         emotion_estimator: EmotionEstimator | None = None,
         comment_generator: CommentGenerator | None = None,
         audio_analyzer: AudioAnalyzer | None = None,
+        audio_event_detector: AudioEventDetector | None = None,
         vad: VoiceActivityDetector | None = None,
         transcriber: WhisperTranscriber | None = None,
         queue: TaskQueue | None = None,
@@ -327,6 +328,7 @@ class RealtimePipeline:
         self.emotion_estimator = emotion_estimator or EmotionEstimator()
         self.comment_generator = comment_generator or CommentGenerator()
         self.audio_analyzer = audio_analyzer or AudioAnalyzer()
+        self.audio_event_detector = audio_event_detector or AudioEventDetector()
         self.vad = vad or VoiceActivityDetector()
         self.transcriber = transcriber or WhisperTranscriber()
         self.queue = queue or TaskQueue()
@@ -383,8 +385,10 @@ class RealtimePipeline:
 
     def build_context(self, frame: Frame, audio: AudioChunk | None = None) -> CommentaryContext:
         scene = self.scene_analyzer.analyze(frame)
-        event = self.event_detector.detect(scene)
+        scene_event = self.event_detector.detect(scene)
         audio_features = self.audio_analyzer.analyze(audio) if audio else None
+        audio_event = self.audio_event_detector.detect(audio_features)
+        event = self._select_event(scene_event, audio_event)
         vad_result = self.vad.detect(audio) if audio else None
         transcript = self.transcriber.transcribe(audio) if audio else None
         context = CommentaryContext(
@@ -408,6 +412,17 @@ class RealtimePipeline:
             memory=memory,
         )
         return context
+
+    def _select_event(
+        self,
+        scene_event: CommentaryEvent | None,
+        audio_event: CommentaryEvent | None,
+    ) -> CommentaryEvent | None:
+        if scene_event is None:
+            return audio_event
+        if audio_event is None:
+            return scene_event
+        return audio_event if audio_event.salience > scene_event.salience else scene_event
 
     def run_once(self, frame: Frame, on_speech: Callable[[SpeechItem], None] | None = None) -> CommentaryContext:
         context = self.process_frame(frame)

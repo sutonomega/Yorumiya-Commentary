@@ -6,6 +6,7 @@ from tempfile import TemporaryDirectory
 from yorumiya_commentary import (
     AudioAnalyzer,
     AudioContextTrace,
+    AudioEventDetector,
     CommentGenerator,
     CommentPolicy,
     CompanionMode,
@@ -565,6 +566,27 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(vad.start, 12.0)
         self.assertEqual(vad.reason, "speech_detected")
         self.assertIn(audio.atmosphere, {"active", "excited"})
+
+    def test_audio_event_detector_creates_commentary_event_from_impact(self):
+        audio = AudioAnalyzer().analyze(AudioChunk(timestamp=2.0, samples=(0.0, 0.9, 0.1), sample_rate=3))
+
+        event = AudioEventDetector().detect(audio)
+
+        self.assertEqual(event.kind, "audio_impact")
+        self.assertTrue(event.should_speak)
+        self.assertEqual(event.metadata["source"], "audio")
+        self.assertEqual(event.metadata["audio_event"], "impact")
+
+    def test_realtime_pipeline_uses_audio_event_when_more_salient_than_scene_event(self):
+        frame = next(VideoInput(["quiet field"], fps=1).iter_frames())
+        chunk = AudioChunk(timestamp=0.0, samples=(0.0, 0.9, 0.1), sample_rate=3)
+        pipeline = RealtimePipeline()
+
+        result = pipeline.process_frame_step(frame, audio=chunk)
+
+        self.assertEqual(result.context.event.kind, "audio_impact")
+        self.assertEqual(result.comment_decision.reason, "audio_impact")
+        self.assertIsNotNone(result.speech_item)
 
     def test_realtime_pipeline_merges_audio_into_context(self):
         frame = next(VideoInput(["battle critical hit"], fps=1).iter_frames())

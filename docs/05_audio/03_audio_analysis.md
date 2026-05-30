@@ -39,3 +39,13 @@ adapter が返せるもの:
 - `WhisperTranscriber` の transcript は raw text を保存せず、存在有無と confidence だけを記録する。
 
 これにより、Quiet AI が「人が話しているから黙った」のか、「音声はあるが発話ではない」のかを trace から確認できる。
+
+## Audio Event Detection
+
+`AudioEventDetector` は `AudioFeatures` から音声由来の `CommentaryEvent` を作る。
+
+- `audio_impact`: `AudioFeatures.event == "impact"` の時に作る。
+- `audio_excited`: `atmosphere == "excited"` の時に作る。
+- `audio_active`: `atmosphere == "active"` の時に作る。
+
+`RealtimePipeline` は scene event と audio event の salience を比較し、高い方を `CommentaryContext.event` に採用する。これにより、画面変化が小さくても大きな効果音や盛り上がりを commentary の判断材料にできる。

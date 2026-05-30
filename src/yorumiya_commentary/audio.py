@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from math import sqrt
 from typing import Any
 
-from .models import AudioChunk, AudioFeatures, Transcript, VadResult
+from .models import AudioChunk, AudioFeatures, CommentaryEvent, Transcript, VadResult
 
 
 TranscriptAdapterPayload = Transcript | dict[str, Any] | str | None
@@ -133,3 +133,54 @@ class AudioAnalyzer:
         atmosphere = "excited" if peak >= 0.7 or rms >= 0.28 else "active" if rms >= 0.1 else "calm"
         event = "impact" if peak >= 0.85 else None
         return AudioFeatures(chunk.timestamp, rms=rms, peak=peak, loudness=loudness, atmosphere=atmosphere, event=event)
+
+
+@dataclass(frozen=True)
+class AudioEventDetectionPolicy:
+    speak_threshold: float = 0.45
+    impact_salience: float = 0.85
+    excited_salience: float = 0.55
+    active_salience: float = 0.35
+
+    def __post_init__(self) -> None:
+        for name, value in (
+            ("speak_threshold", self.speak_threshold),
+            ("impact_salience", self.impact_salience),
+            ("excited_salience", self.excited_salience),
+            ("active_salience", self.active_salience),
+        ):
+            if not 0 <= value <= 1:
+                raise ValueError(f"{name} must be between 0 and 1")
+
+
+class AudioEventDetector:
+    def __init__(self, policy: AudioEventDetectionPolicy | None = None):
+        self.policy = policy or AudioEventDetectionPolicy()
+
+    def detect(self, audio: AudioFeatures | None) -> CommentaryEvent | None:
+        if audio is None:
+            return None
+        if audio.event == "impact":
+            return self._event(audio, "audio_impact", "Audio impact detected", self.policy.impact_salience)
+        if audio.atmosphere == "excited":
+            return self._event(audio, "audio_excited", "Audio became excited", self.policy.excited_salience)
+        if audio.atmosphere == "active":
+            return self._event(audio, "audio_active", "Audio became active", self.policy.active_salience)
+        return None
+
+    def _event(self, audio: AudioFeatures, kind: str, description: str, salience: float) -> CommentaryEvent:
+        return CommentaryEvent(
+            timestamp=audio.timestamp,
+            kind=kind,
+            description=description,
+            salience=salience,
+            should_speak=salience >= self.policy.speak_threshold,
+            metadata={
+                "source": "audio",
+                "loudness": audio.loudness,
+                "atmosphere": audio.atmosphere,
+                "audio_event": audio.event,
+                "rms": audio.rms,
+                "peak": audio.peak,
+            },
+        )
