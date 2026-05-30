@@ -46,6 +46,9 @@ scheduler は tick、frame、inference、speech の周期を管理する。`Real
 - `RuntimeTick`: timestamp と任意の `frame` / `audio` を持つ。
 - `RealtimeLoop.step()`: 1 tick を `run_due_steps()` に渡す。
 - `RealtimeLoop.run()`: tick 列を処理し、`RuntimeTickResult` の list を返す。
+- `RealtimeLoop.run_recorded()`: tick 列を処理し、`RuntimeTraceRecorder` に trace を蓄積する。
 - `RealtimeLoop.run_frames()`: frame timestamp を tick timestamp として扱う。
 
 `RealtimeLoop` は sleep、thread、asyncio を持たない。実時間の待機や停止制御は M3 以降の adapter / application layer で扱う。
+
+`run_recorded()` と `RuntimeTraceRecorder.to_jsonl()` を組み合わせることで、deterministic な tick 列から runtime 全体の観測ログを JSONL として外へ渡せる。

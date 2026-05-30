@@ -494,6 +494,35 @@ class CorePipelineTest(unittest.TestCase):
         self.assertTrue(rows[0]["speech_trace"]["synthesized"])
         self.assertEqual(rows[1]["speech_trace"]["skipped_reason"], "no_speech")
 
+    def test_realtime_loop_runs_and_records_runtime_traces(self):
+        frame = next(
+            VideoInput(
+                [
+                    {
+                        "summary": "menu opened",
+                        "labels": ["menu"],
+                        "ui_elements": ["menu"],
+                        "confidence": 0.8,
+                    }
+                ],
+                fps=1,
+            ).iter_frames()
+        )
+        loop = RealtimeLoop(
+            pipeline=RealtimePipeline(voice_synthesizer=FakeVoiceSynthesizer()),
+            scheduler=RealtimeScheduler(frame_interval=1.0, speech_interval=0.5),
+        )
+
+        recorder = loop.run_recorded([RuntimeTick(timestamp=0.0, frame=frame), RuntimeTick(timestamp=0.5)])
+        rows = [json.loads(line) for line in recorder.to_jsonl().splitlines()]
+
+        self.assertEqual(len(rows), 2)
+        self.assertTrue(rows[0]["frame_due"])
+        self.assertEqual(rows[0]["frame_trace"]["event_source"], "scene")
+        self.assertTrue(rows[0]["speech_trace"]["synthesized"])
+        self.assertFalse(rows[1]["frame_due"])
+        self.assertEqual(rows[1]["speech_trace"]["skipped_reason"], "no_speech")
+
     def test_audio_context_trace_records_audio_vad_and_transcript_state(self):
         frame = next(VideoInput(["battle critical hit"], fps=1).iter_frames())
         chunk = AudioChunk(timestamp=0.0, samples=(0.0, 0.4, 0.5, 0.2), sample_rate=4)

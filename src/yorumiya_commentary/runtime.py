@@ -524,5 +524,11 @@ class RealtimeLoop:
     def run(self, ticks: Iterable[RuntimeTick]) -> list[RuntimeTickResult]:
         return [self.step(tick) for tick in ticks]
 
+    def run_recorded(self, ticks: Iterable[RuntimeTick], recorder: RuntimeTraceRecorder | None = None) -> RuntimeTraceRecorder:
+        resolved = recorder or RuntimeTraceRecorder()
+        for tick in ticks:
+            resolved.record(self.step(tick))
+        return resolved
+
     def run_frames(self, frames: Iterable[Frame]) -> list[RuntimeTickResult]:
         return [self.step(RuntimeTick(timestamp=frame.timestamp, frame=frame)) for frame in frames]

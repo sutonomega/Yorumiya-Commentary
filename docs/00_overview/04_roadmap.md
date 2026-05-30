@@ -20,26 +20,36 @@ Roadmap は milestone ごとに system の責務を広げる。
 
 M2 の目的は「frame から発話候補まで流れること」を確認すること。
 
-## M3: Audio Understanding
+## M3: Realtime Foundation
 
-- Whisper integration
-- VAD integration
-- audio analyzer
-- atmosphere estimation
-- speech timing suppression
+- RealtimeScheduler
+- run_due_steps()
+- RealtimeLoop
+- RuntimeTick
+- RuntimeTickResult
+- PipelineTrace
+- SpeechTrace
+- RuntimeTickTrace
+- RuntimeTraceRecorder
+- JSONL export
 
-M3 の目的は「音声情報で喋る/黙る判断を改善すること」。
+M3 の目的は「リアルタイム実行と観測の基盤を構築すること」。
 
-## M4: Runtime Stability
+Status: complete.
 
-- realtime scheduler
-- queue system
-- logging
-- error handling
-- config system
-- latency measurement
+## M4: Audio Understanding
 
-M4 の目的は「長く動かしても判断を追えること」。
+- AudioAnalyzer
+- VoiceActivityDetector
+- WhisperTranscriber
+- transcript suppression
+- AudioEventDetector
+- EventSelectionTrace
+- event source tracking
+
+M4 の目的は「音声情報を実況判断へ統合すること」。
+
+Status: in progress.
 
 ## M5: Companion AI
 
