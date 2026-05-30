@@ -245,6 +245,47 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(result.comment_decision.reason, "no_signal")
         self.assertIsNone(result.speech_item)
 
+    def test_pipeline_step_result_creates_trace_for_spoken_comment(self):
+        frame = next(
+            VideoInput(
+                [
+                    {
+                        "summary": "menu opened",
+                        "labels": ["menu", "score"],
+                        "ui_elements": ["menu", "score"],
+                        "confidence": 0.8,
+                    }
+                ],
+                fps=1,
+            ).iter_frames()
+        )
+        pipeline = RealtimePipeline(voice_synthesizer=FakeVoiceSynthesizer())
+
+        result = pipeline.process_frame_step(frame, synthesize=True)
+        trace = result.to_trace()
+
+        self.assertEqual(trace.timestamp, 0.0)
+        self.assertEqual(trace.event_kind, "scene_initial")
+        self.assertEqual(trace.decision_reason, "scene_initial")
+        self.assertFalse(trace.suppressed)
+        self.assertTrue(trace.has_comment)
+        self.assertTrue(trace.has_speech_item)
+        self.assertTrue(trace.has_speech_audio)
+        self.assertTrue(trace.as_dict()["has_speech_audio"])
+
+    def test_trace_step_records_suppressed_decision_and_queue_count(self):
+        video = VideoInput(["same scene", "same scene"], fps=1)
+        pipeline = RealtimePipeline()
+        frames = list(video.iter_frames())
+
+        pipeline.trace_step(frames[0])
+        trace = pipeline.trace_step(frames[1])
+
+        self.assertEqual(trace.decision_reason, "no_signal")
+        self.assertTrue(trace.suppressed)
+        self.assertFalse(trace.has_speech_item)
+        self.assertEqual(trace.queue_speech_count, 0)
+
     def test_audio_analyzer_and_vad_produce_timestamped_results(self):
         chunk = AudioChunk(timestamp=12.0, samples=(0.0, 0.1, 0.2, 0.0, 0.4), sample_rate=5)
 
