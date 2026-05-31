@@ -19,6 +19,7 @@ from yorumiya_commentary import (
     FrameFileInput,
     FrameSampler,
     FrameSamplingPolicy,
+    MemoryStore,
     RealtimeLoop,
     RealtimePipeline,
     RealtimeScheduler,
@@ -823,6 +824,35 @@ class CorePipelineTest(unittest.TestCase):
             restored.memory.load_long_memory(path)
 
         self.assertIn("この盛り上がりを覚えて", restored.memory.recall("盛り上がり"))
+
+    def test_companion_mode_exposes_foundation_state_without_model_behavior(self):
+        companion = CompanionMode(conversation_limit=1)
+        companion.switch(True)
+
+        first = companion.respond("最初の話")
+        second = companion.respond("次の話")
+        state = companion.as_dict()
+
+        self.assertEqual(first.reason, "companion")
+        self.assertEqual(second.reason, "companion")
+        self.assertEqual(len(companion.conversation_context(limit=10)), 1)
+        self.assertTrue(state["active"])
+        self.assertEqual(state["turns"][0]["user_text"], "次の話")
+        self.assertIn("次の話", state["memory"]["long_memory"])
+
+    def test_memory_store_loads_legacy_list_and_current_dict_payloads(self):
+        with TemporaryDirectory() as temp_dir:
+            legacy_path = Path(temp_dir) / "legacy.json"
+            current_path = Path(temp_dir) / "current.json"
+            legacy_path.write_text(json.dumps(["legacy memory"], ensure_ascii=False), encoding="utf-8")
+            current_path.write_text(json.dumps({"long_memory": ["current memory"]}, ensure_ascii=False), encoding="utf-8")
+
+            memory = MemoryStore()
+            memory.load_long_memory(legacy_path)
+            memory.load_long_memory(current_path)
+
+        self.assertIn("legacy memory", memory.recall("legacy"))
+        self.assertIn("current memory", memory.recall("current"))
 
 
 if __name__ == "__main__":

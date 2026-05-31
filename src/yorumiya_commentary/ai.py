@@ -72,15 +72,24 @@ class MemoryStore:
         items = self.recall(limit=limit)
         return " / ".join(items)
 
+    def as_dict(self) -> dict[str, list[str]]:
+        return {
+            "short_memory": list(self.short_memory),
+            "long_memory": list(self.long_memory),
+        }
+
     def save_long_memory(self, path: str | Path) -> None:
         target = Path(path)
-        target.write_text(json.dumps(list(self.long_memory), ensure_ascii=False, indent=2), encoding="utf-8")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(self.as_dict()["long_memory"], ensure_ascii=False, indent=2), encoding="utf-8")
 
     def load_long_memory(self, path: str | Path) -> None:
         target = Path(path)
         if not target.exists():
             return
-        for item in json.loads(target.read_text(encoding="utf-8")):
+        payload = json.loads(target.read_text(encoding="utf-8"))
+        items = payload.get("long_memory", []) if isinstance(payload, dict) else payload
+        for item in items:
             self.add(str(item), long_term=True)
 
     def is_repeated(self, text: str, window: int = 6) -> bool:
@@ -198,6 +207,14 @@ class ConversationTurn:
     response_text: str
     emotion: str = "calm"
 
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "timestamp": self.timestamp,
+            "user_text": self.user_text,
+            "response_text": self.response_text,
+            "emotion": self.emotion,
+        }
+
 
 @dataclass
 class CompanionMode:
@@ -221,6 +238,14 @@ class CompanionMode:
 
     def conversation_context(self, limit: int = 5) -> tuple[ConversationTurn, ...]:
         return tuple(list(self.turns)[-limit:])
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "active": self.active,
+            "memory": self.memory.as_dict(),
+            "turns": [turn.as_dict() for turn in self.turns],
+            "emotion": self.emotion.emotion if self.emotion else None,
+        }
 
     def respond(self, user_text: str, context: CommentaryContext | None = None) -> Comment:
         if context:
