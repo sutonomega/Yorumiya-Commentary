@@ -1,6 +1,6 @@
 """Yorumiya Commentary core package."""
 
-from .ai import CommentDecision, CommentGenerator, CommentPolicy, CompanionMode, EmotionEstimator, MemoryStore
+from .ai import CommentDecision, CommentGenerator, CommentPolicy, CompanionMode, ConversationTurn, EmotionEstimator, MemoryStore
 from .audio import (
     AudioAnalyzer,
     AudioEventDetectionPolicy,
@@ -43,6 +43,7 @@ __all__ = [
     "CommentDecision",
     "CommentPolicy",
     "CompanionMode",
+    "ConversationTurn",
     "EmotionEstimator",
     "EventDetectionConfig",
     "EventDetector",

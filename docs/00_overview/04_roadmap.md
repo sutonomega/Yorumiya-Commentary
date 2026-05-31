@@ -60,3 +60,29 @@ Status: complete.
 - memory-aware response
 
 M5 の目的は「一緒に過ごしている存在感」を作ること。
+
+Status: complete.
+
+## M6: Voice Integration
+
+- VoicevoxSynthesizer
+- VoicevoxClient
+- Speech queue integration
+- voice trace
+
+M6 の目的は「実際の音声合成エンジンと接続すること」。
+
+Status: planned.
+
+## M7: Production Runtime
+
+- while running loop
+- runtime service
+- graceful shutdown
+- runtime metrics
+- file recorder
+- monitoring
+
+M7 の目的は「常時稼働可能な realtime runtime を完成させること」。
+
+Status: planned.

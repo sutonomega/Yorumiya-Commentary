@@ -6,6 +6,19 @@
 - 発話は短く、場面の余白を残す。
 - memory は自然に使い、説明的に出しすぎない。
 
+## Companion State
+
+`CompanionMode` は次の状態を持つ。
+
+- active flag
+- short / long memory
+- conversation turns
+- latest emotion state
+
+`CompanionMode.observe()` は `CommentaryContext.emotion` を保持し、高 salience event を long memory に入れる。
+
+`CompanionMode.respond()` は user text、memory recall、latest emotion を使って短い response を返し、会話履歴を `ConversationTurn` として保持する。
+
 ## MVP Commentary Rules
 
 - `ui_change` は UI の変化に短く触れる。

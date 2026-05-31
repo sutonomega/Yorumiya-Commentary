@@ -12,6 +12,7 @@ from yorumiya_commentary import (
     CompanionMode,
     EventDetector,
     EventSelectionTrace,
+    EmotionEstimator,
     FakeVoiceSynthesizer,
     FrameFileInput,
     FrameSampler,
@@ -717,6 +718,36 @@ class CorePipelineTest(unittest.TestCase):
 
         self.assertEqual(first.reason, "companion")
         self.assertIn("ボス戦", second.text)
+
+    def test_companion_mode_persists_memory_and_conversation_context(self):
+        companion = CompanionMode()
+        companion.switch(True)
+        context = CommentaryContext(
+            timestamp=3.0,
+            event=CommentaryEvent(timestamp=3.0, kind="audio_impact", description="Boss roar", salience=0.9, should_speak=True),
+            emotion=EmotionEstimator().estimate(
+                CommentaryContext(
+                    timestamp=3.0,
+                    event=CommentaryEvent(timestamp=3.0, kind="audio_impact", description="Boss roar", salience=0.9, should_speak=True),
+                )
+            ),
+        )
+
+        comment = companion.respond("この盛り上がりを覚えて", context=context)
+
+        self.assertEqual(comment.timestamp, 3.0)
+        self.assertGreater(comment.priority, 0.0)
+        self.assertEqual(companion.emotion.emotion, "interested")
+        self.assertEqual(companion.conversation_context()[0].user_text, "この盛り上がりを覚えて")
+        self.assertIn("Boss roar", companion.memory.recall("Boss"))
+
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "memory.json"
+            companion.memory.save_long_memory(path)
+            restored = CompanionMode()
+            restored.memory.load_long_memory(path)
+
+        self.assertIn("この盛り上がりを覚えて", restored.memory.recall("盛り上がり"))
 
 
 if __name__ == "__main__":

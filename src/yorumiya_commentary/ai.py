@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 from collections import deque
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from .models import Comment, CommentaryContext, EmotionState, now_timestamp
 
@@ -65,6 +67,21 @@ class MemoryStore:
         terms = set(query.lower().split())
         ranked = [item for item in source if terms & set(item.lower().split())]
         return tuple((ranked or source)[-limit:])
+
+    def summarize(self, limit: int = 5) -> str:
+        items = self.recall(limit=limit)
+        return " / ".join(items)
+
+    def save_long_memory(self, path: str | Path) -> None:
+        target = Path(path)
+        target.write_text(json.dumps(list(self.long_memory), ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def load_long_memory(self, path: str | Path) -> None:
+        target = Path(path)
+        if not target.exists():
+            return
+        for item in json.loads(target.read_text(encoding="utf-8")):
+            self.add(str(item), long_term=True)
 
     def is_repeated(self, text: str, window: int = 6) -> bool:
         return text in list(self.short_memory)[-window:]
@@ -175,17 +192,49 @@ class CommentGenerator:
 
 
 @dataclass
+class ConversationTurn:
+    timestamp: float
+    user_text: str
+    response_text: str
+    emotion: str = "calm"
+
+
+@dataclass
 class CompanionMode:
     memory: MemoryStore = field(default_factory=MemoryStore)
     active: bool = False
+    conversation_limit: int = 20
+    turns: deque[ConversationTurn] = field(init=False)
+    emotion: EmotionState | None = None
+
+    def __post_init__(self) -> None:
+        self.turns = deque(maxlen=self.conversation_limit)
 
     def switch(self, active: bool) -> None:
         self.active = active
 
+    def observe(self, context: CommentaryContext) -> EmotionState | None:
+        self.emotion = context.emotion
+        if context.event and context.event.salience >= 0.8:
+            self.memory.add(context.event.description, long_term=True)
+        return self.emotion
+
+    def conversation_context(self, limit: int = 5) -> tuple[ConversationTurn, ...]:
+        return tuple(list(self.turns)[-limit:])
+
     def respond(self, user_text: str, context: CommentaryContext | None = None) -> Comment:
+        if context:
+            self.observe(context)
         recalled = self.memory.recall(user_text, limit=2)
         prefix = "うん、" if self.active else "実況側から見ると、"
         memory_hint = f" 前にも {recalled[-1]} があったね。" if recalled else ""
+        emotion_hint = f" 今は{self.emotion.emotion}寄り。" if self.emotion and self.emotion.emotion != "calm" else ""
         text = f"{prefix}{user_text[:28]}。{memory_hint}".strip()
+        text = f"{text}{emotion_hint}".strip()
         self.memory.add(user_text, long_term=True)
-        return Comment(timestamp=context.timestamp if context else now_timestamp(), text=text, priority=0.5, reason="companion")
+        timestamp = context.timestamp if context else now_timestamp()
+        emotion = self.emotion.emotion if self.emotion else "calm"
+        priority = self.emotion.speak_priority if self.emotion else 0.5
+        comment = Comment(timestamp=timestamp, text=text, priority=priority, reason="companion")
+        self.turns.append(ConversationTurn(timestamp=timestamp, user_text=user_text, response_text=text, emotion=emotion))
+        return comment
