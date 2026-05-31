@@ -570,6 +570,32 @@ class CorePipelineTest(unittest.TestCase):
         self.assertGreaterEqual(service.metrics.synthesized, 1)
         self.assertEqual(service.snapshot()["traces"], 2)
 
+    def test_runtime_service_stop_when_done_and_file_recorder_snapshot(self):
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "trace.jsonl"
+            service = RuntimeService(file_recorder=FileTraceRecorder(path))
+            results = service.run([RuntimeTick(timestamp=0.0), RuntimeTick(timestamp=0.2)], stop_when_done=True)
+            rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+
+        self.assertEqual(len(results), 2)
+        self.assertFalse(service.is_running)
+        self.assertEqual(service.snapshot()["file_recorder"], str(path))
+        self.assertEqual(service.snapshot()["metrics"]["ticks"], 2)
+        self.assertEqual(len(rows), 2)
+
+    def test_runtime_service_max_ticks_keeps_forever_loop_bounded_for_tests(self):
+        service = RuntimeService()
+
+        results = service.run_forever(
+            [RuntimeTick(timestamp=0.0), RuntimeTick(timestamp=0.2), RuntimeTick(timestamp=0.4)],
+            max_ticks=2,
+        )
+
+        self.assertEqual(len(results), 2)
+        self.assertTrue(service.is_running)
+        service.stop()
+        self.assertFalse(service.is_running)
+
     def test_file_trace_recorder_appends_jsonl(self):
         trace = RealtimeLoop().step(RuntimeTick(timestamp=0.0)).to_trace()
 
