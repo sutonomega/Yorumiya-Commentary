@@ -363,6 +363,7 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(trace.event_kind, "scene_initial")
         self.assertEqual(trace.event_source, "scene")
         self.assertEqual(trace.decision_reason, "scene_initial")
+        self.assertEqual(trace.decision_source, "event")
         self.assertFalse(trace.suppressed)
         self.assertTrue(trace.has_comment)
         self.assertTrue(trace.has_speech_item)
@@ -767,11 +768,24 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(trace.event_kind, "transcript_signal")
         self.assertEqual(trace.event_source, "transcript")
         self.assertEqual(trace.decision_reason, "transcript_speech")
+        self.assertEqual(trace.decision_source, "transcript")
         self.assertTrue(trace.suppressed)
         self.assertEqual(trace.event_selection.selected_source, "transcript")
         self.assertEqual(trace.event_selection.reason, "transcript_higher_salience")
         self.assertEqual(trace.event_selection.transcript_event_kind, "transcript_signal")
         self.assertEqual(trace.as_dict()["event_selection"]["transcript_event_kind"], "transcript_signal")
+
+    def test_pipeline_trace_records_vad_suppression_source(self):
+        frame = next(VideoInput(["quiet field"], fps=1).iter_frames())
+        chunk = AudioChunk(timestamp=0.0, samples=(0.3, 0.4, 0.3, 0.0), sample_rate=4)
+
+        trace = RealtimePipeline().process_frame_step(frame, audio=chunk).to_trace()
+
+        self.assertEqual(trace.decision_reason, "vad_speech")
+        self.assertEqual(trace.decision_source, "vad")
+        self.assertTrue(trace.suppressed)
+        self.assertTrue(trace.audio_trace.vad_is_speech)
+        self.assertEqual(trace.as_dict()["decision_source"], "vad")
 
     def test_realtime_pipeline_merges_audio_into_context(self):
         frame = next(VideoInput(["battle critical hit"], fps=1).iter_frames())
