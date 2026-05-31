@@ -49,7 +49,7 @@ Status: complete.
 
 M4 の目的は「音声情報を実況判断へ統合すること」。
 
-Status: complete.
+Status: in progress. Transcript event detection and event source tracking are available; Whisper/VAD/audio-event tuning and richer audio understanding remain.
 
 ## M5: Companion AI
 
@@ -61,7 +61,7 @@ Status: complete.
 
 M5 の目的は「一緒に過ごしている存在感」を作ること。
 
-Status: complete.
+Status: foundation. Memory persistence, conversation turns, and emotion-aware responses exist; richer companion behavior is still future work.
 
 ## M6: Voice Integration
 
@@ -72,7 +72,7 @@ Status: complete.
 
 M6 の目的は「実際の音声合成エンジンと接続すること」。
 
-Status: complete.
+Status: foundation. VOICEVOX adapter boundary, fake voice, playback boundary, and failure handling exist; live engine validation and playback integration remain.
 
 ## M7: Production Runtime
 
@@ -85,4 +85,4 @@ Status: complete.
 
 M7 の目的は「常時稼働可能な realtime runtime を完成させること」。
 
-Status: complete.
+Status: foundation. RuntimeService, metrics, graceful stop, and file trace recording exist; long-running service operations and monitoring remain.
