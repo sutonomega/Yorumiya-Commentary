@@ -49,7 +49,7 @@ Status: complete.
 
 M4 の目的は「音声情報を実況判断へ統合すること」。
 
-Status: in progress. Transcript event detection and event source tracking are available; Whisper/VAD/audio-event tuning and richer audio understanding remain.
+Status: complete for MVP. Scene, audio, transcript events are unified in `CommentaryEvent`; event selection and audio-derived suppression are traceable.
 
 ## M5: Companion AI
 

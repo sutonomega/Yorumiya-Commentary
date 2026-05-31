@@ -13,6 +13,7 @@
 - `event_source`
 - `event_salience`
 - `decision_reason`
+- `decision_source`
 - `suppressed`
 - `has_comment`
 - `has_speech_item`
@@ -38,6 +39,18 @@
 - `transcript_event_salience`
 
 `reason` は `scene_only`、`audio_only`、`transcript_only`、`audio_higher_salience`、`transcript_higher_salience`、`scene_higher_or_equal_salience`、`no_event` のいずれかである。
+
+## Decision Source
+
+`PipelineTrace.decision_source` は最終判断の由来を記録する。
+
+- `vad`: VAD による `vad_speech` suppression。
+- `transcript`: transcript confidence による `transcript_speech` suppression。
+- `event`: event kind、salience、stale context による判断。
+- `memory`: repeated comment suppression。
+- `none`: no signal。
+
+これにより「音に反応した」のか、「音声情報によって黙った」のかを trace から分けて確認できる。
 
 ## Audio Context Trace
 

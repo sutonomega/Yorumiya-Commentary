@@ -8,7 +8,17 @@ from pathlib import Path
 from time import monotonic
 from typing import Any
 
-from .ai import CommentDecision, CommentGenerator, EmotionEstimator
+from .ai import (
+    SUPPRESSION_LOW_SALIENCE,
+    SUPPRESSION_NO_SIGNAL,
+    SUPPRESSION_REPEATED_COMMENT,
+    SUPPRESSION_STALE_CONTEXT,
+    SUPPRESSION_TRANSCRIPT_SPEECH,
+    SUPPRESSION_VAD_SPEECH,
+    CommentDecision,
+    CommentGenerator,
+    EmotionEstimator,
+)
 from .audio import AudioAnalyzer, AudioEventDetector, TranscriptEventDetector, VoiceActivityDetector, WhisperTranscriber
 from .event import EventDetector
 from .models import AudioChunk, CommentaryContext, CommentaryEvent, Frame, SpeechAudio, SpeechItem
@@ -195,6 +205,7 @@ class PipelineTrace:
     event_source: str | None
     event_salience: float | None
     decision_reason: str
+    decision_source: str
     suppressed: bool
     has_comment: bool
     has_speech_item: bool
@@ -212,6 +223,7 @@ class PipelineTrace:
             event_source=event.metadata.get("source", "scene") if event else None,
             event_salience=event.salience if event else None,
             decision_reason=result.comment_decision.reason,
+            decision_source=_decision_source(result.comment_decision.reason),
             suppressed=result.comment_decision.suppressed,
             has_comment=result.comment_decision.comment is not None,
             has_speech_item=result.speech_item is not None,
@@ -228,6 +240,7 @@ class PipelineTrace:
             "event_source": self.event_source,
             "event_salience": self.event_salience,
             "decision_reason": self.decision_reason,
+            "decision_source": self.decision_source,
             "suppressed": self.suppressed,
             "has_comment": self.has_comment,
             "has_speech_item": self.has_speech_item,
@@ -666,3 +679,17 @@ class RuntimeService:
             "queue": self.loop.pipeline.queue.state(),
             "traces": len(self.recorder.traces),
         }
+
+
+def _decision_source(reason: str) -> str:
+    if reason == SUPPRESSION_VAD_SPEECH:
+        return "vad"
+    if reason == SUPPRESSION_TRANSCRIPT_SPEECH:
+        return "transcript"
+    if reason in {SUPPRESSION_LOW_SALIENCE, SUPPRESSION_STALE_CONTEXT}:
+        return "event"
+    if reason == SUPPRESSION_REPEATED_COMMENT:
+        return "memory"
+    if reason == SUPPRESSION_NO_SIGNAL:
+        return "none"
+    return "event"
