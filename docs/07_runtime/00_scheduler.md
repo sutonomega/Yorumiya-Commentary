@@ -52,3 +52,7 @@ scheduler は tick、frame、inference、speech の周期を管理する。`Real
 `RealtimeLoop` は sleep、thread、asyncio を持たない。実時間の待機や停止制御は M3 以降の adapter / application layer で扱う。
 
 `run_recorded()` と `RuntimeTraceRecorder.to_jsonl()` を組み合わせることで、deterministic な tick 列から runtime 全体の観測ログを JSONL として外へ渡せる。
+
+## Playback Step
+
+`RealtimePipeline.run_playback_step()` は `SpeechAudio` を audio player adapter に渡す。voice synthesizer と audio player を分けることで、合成失敗、queue 空、再生 adapter 未設定を別々に観測できる。

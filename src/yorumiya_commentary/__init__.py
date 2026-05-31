@@ -32,11 +32,22 @@ from .runtime import (
 )
 from .scene import SceneAnalysisConfig, SceneAnalyzer
 from .video import FrameFileInput, FrameSampler, FrameSamplingPolicy, VideoInput
-from .voice import FakeVoiceSynthesizer, SpeechStyle, VoicevoxClient, VoicevoxSynthesizer, comment_to_speech_item
+from .voice import (
+    AudioPlayer,
+    FakeAudioPlayer,
+    FakeVoiceSynthesizer,
+    PlaybackResult,
+    SpeechStyle,
+    VoiceSynthesisError,
+    VoicevoxClient,
+    VoicevoxSynthesizer,
+    comment_to_speech_item,
+)
 
 __all__ = [
     "AudioAnalyzer",
     "AudioContextTrace",
+    "AudioPlayer",
     "AudioEventDetectionPolicy",
     "AudioEventDetector",
     "CommentGenerator",
@@ -51,8 +62,10 @@ __all__ = [
     "FrameFileInput",
     "FrameSampler",
     "FrameSamplingPolicy",
+    "FakeAudioPlayer",
     "FakeVoiceSynthesizer",
     "MemoryStore",
+    "PlaybackResult",
     "PipelineStepResult",
     "PipelineTrace",
     "RealtimeLoop",
@@ -75,6 +88,7 @@ __all__ = [
     "VideoInput",
     "VoiceActivityDetector",
     "VoiceActivityPolicy",
+    "VoiceSynthesisError",
     "VoicevoxClient",
     "VoicevoxSynthesizer",
     "WhisperTranscriber",

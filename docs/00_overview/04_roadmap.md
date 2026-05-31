@@ -72,7 +72,7 @@ Status: complete.
 
 M6 の目的は「実際の音声合成エンジンと接続すること」。
 
-Status: planned.
+Status: complete.
 
 ## M7: Production Runtime
 

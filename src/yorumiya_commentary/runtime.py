@@ -12,7 +12,7 @@ from .audio import AudioAnalyzer, AudioEventDetector, TranscriptEventDetector, V
 from .event import EventDetector
 from .models import AudioChunk, CommentaryContext, CommentaryEvent, Frame, SpeechAudio, SpeechItem
 from .scene import SceneAnalyzer
-from .voice import SpeechStyle, SpeechSynthesizer, comment_to_speech_item
+from .voice import AudioPlayer, PlaybackResult, SpeechStyle, SpeechSynthesizer, comment_to_speech_item
 
 
 @dataclass(frozen=True)
@@ -242,6 +242,7 @@ class SpeechStepResult:
     speech_item: SpeechItem | None = None
     speech_audio: SpeechAudio | None = None
     skipped_reason: str | None = None
+    error: str | None = None
 
     @property
     def synthesized(self) -> bool:
@@ -253,6 +254,7 @@ class SpeechTrace:
     timestamp: float
     synthesized: bool
     skipped_reason: str | None
+    error: str | None
     has_speech_item: bool
     has_speech_audio: bool
     speech_timestamp: float | None = None
@@ -264,6 +266,7 @@ class SpeechTrace:
             timestamp=timestamp,
             synthesized=result.synthesized,
             skipped_reason=result.skipped_reason,
+            error=result.error,
             has_speech_item=result.speech_item is not None,
             has_speech_audio=result.speech_audio is not None,
             speech_timestamp=result.speech_item.timestamp if result.speech_item else None,
@@ -275,6 +278,7 @@ class SpeechTrace:
             "timestamp": self.timestamp,
             "synthesized": self.synthesized,
             "skipped_reason": self.skipped_reason,
+            "error": self.error,
             "has_speech_item": self.has_speech_item,
             "has_speech_audio": self.has_speech_audio,
             "speech_timestamp": self.speech_timestamp,
@@ -390,6 +394,7 @@ class RealtimePipeline:
         queue: TaskQueue | None = None,
         speech_style: SpeechStyle | None = None,
         voice_synthesizer: SpeechSynthesizer | None = None,
+        audio_player: AudioPlayer | None = None,
     ):
         self.scene_analyzer = scene_analyzer or SceneAnalyzer()
         self.event_detector = event_detector or EventDetector()
@@ -403,6 +408,7 @@ class RealtimePipeline:
         self.queue = queue or TaskQueue()
         self.speech_style = speech_style or SpeechStyle()
         self.voice_synthesizer = voice_synthesizer
+        self.audio_player = audio_player
 
     def process_frame(self, frame: Frame, audio: AudioChunk | None = None) -> CommentaryContext:
         return self.process_frame_step(frame, audio).context
@@ -520,7 +526,18 @@ class RealtimePipeline:
         speech = self.queue.get_speech(now=now)
         if speech is None:
             return SpeechStepResult(skipped_reason="no_speech")
-        return SpeechStepResult(speech_item=speech, speech_audio=self.voice_synthesizer.synthesize(speech))
+        try:
+            return SpeechStepResult(speech_item=speech, speech_audio=self.voice_synthesizer.synthesize(speech))
+        except Exception as exc:
+            return SpeechStepResult(speech_item=speech, skipped_reason="voice_synthesis_failed", error=str(exc))
+
+    def run_playback_step(self, audio: SpeechAudio | None = None) -> PlaybackResult:
+        if self.audio_player is None:
+            return PlaybackResult(audio=audio, skipped_reason="no_audio_player")
+        if audio is None:
+            return PlaybackResult(skipped_reason="no_audio")
+        self.audio_player.play(audio)
+        return PlaybackResult(audio=audio, played=True)
 
 
 @dataclass

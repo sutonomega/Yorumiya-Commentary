@@ -13,6 +13,7 @@ from yorumiya_commentary import (
     EventDetector,
     EventSelectionTrace,
     EmotionEstimator,
+    FakeAudioPlayer,
     FakeVoiceSynthesizer,
     FrameFileInput,
     FrameSampler,
@@ -34,7 +35,7 @@ from yorumiya_commentary import (
     WhisperTranscriber,
     comment_to_speech_item,
 )
-from yorumiya_commentary.models import AudioChunk, Comment, CommentaryContext, CommentaryEvent, SpeechItem, Transcript, VadResult
+from yorumiya_commentary.models import AudioChunk, Comment, CommentaryContext, CommentaryEvent, SpeechAudio, SpeechItem, Transcript, VadResult
 
 
 class CorePipelineTest(unittest.TestCase):
@@ -274,6 +275,32 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(result.speech_item.text, "hello")
         self.assertEqual(result.speech_audio.text, "hello")
         self.assertEqual(pipeline.queue.state()["speech"], 0)
+
+    def test_run_speech_step_reports_voice_failure_without_crashing(self):
+        class BrokenVoice:
+            def synthesize(self, item):
+                raise RuntimeError("voice down")
+
+        pipeline = RealtimePipeline(voice_synthesizer=BrokenVoice())
+        pipeline.queue.put_speech(SpeechItem(timestamp=2.0, text="hello"))
+
+        result = pipeline.run_speech_step(now=2.0)
+
+        self.assertEqual(result.skipped_reason, "voice_synthesis_failed")
+        self.assertEqual(result.speech_item.text, "hello")
+        self.assertIsNone(result.speech_audio)
+        self.assertIn("voice down", result.error)
+
+    def test_runtime_playback_step_uses_audio_player_adapter(self):
+        player = FakeAudioPlayer()
+        pipeline = RealtimePipeline(audio_player=player)
+        audio = SpeechAudio(timestamp=1.0, text="hello", audio=b"wav", format="fake-wav")
+
+        result = pipeline.run_playback_step(audio)
+
+        self.assertTrue(result.played)
+        self.assertEqual(player.audios[0], audio)
+        self.assertEqual(pipeline.run_playback_step().skipped_reason, "no_audio")
 
     def test_process_frame_step_exposes_decision_speech_and_audio(self):
         frame = next(
