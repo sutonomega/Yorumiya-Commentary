@@ -20,7 +20,9 @@ class AudioPlayer(Protocol):
 
 
 class VoiceSynthesisError(RuntimeError):
-    pass
+    def __init__(self, message: str, adapter: str = "voicevox"):
+        super().__init__(message)
+        self.adapter = adapter
 
 
 @dataclass(frozen=True)
@@ -28,6 +30,15 @@ class PlaybackResult:
     audio: SpeechAudio | None = None
     played: bool = False
     skipped_reason: str | None = None
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "played": self.played,
+            "skipped_reason": self.skipped_reason,
+            "has_audio": self.audio is not None,
+            "audio_format": self.audio.format if self.audio else None,
+            "audio_timestamp": self.audio.timestamp if self.audio else None,
+        }
 
 
 @dataclass(frozen=True)
@@ -61,6 +72,11 @@ class VoicevoxClient:
     endpoint: str = "http://127.0.0.1:50021"
     timeout: float = 10.0
 
+    def version(self) -> str:
+        url = f"{self.endpoint}/version"
+        with urlopen(Request(url, method="GET"), timeout=self.timeout) as response:
+            return response.read().decode("utf-8").strip().strip('"')
+
     def audio_query(self, text: str, speaker: int) -> dict:
         url = f"{self.endpoint}/audio_query?{urlencode({'text': text, 'speaker': speaker})}"
         with urlopen(Request(url, method="POST"), timeout=self.timeout) as response:
@@ -84,7 +100,9 @@ class VoicevoxSynthesizer:
             query["speedScale"] = item.speed_scale
             query["volumeScale"] = item.volume_scale
             audio = self.client.synthesis(query, item.speaker)
-            return SpeechAudio(timestamp=item.timestamp, text=item.text, audio=audio)
+            return SpeechAudio(timestamp=item.timestamp, text=item.text, audio=audio, format="wav")
+        except VoiceSynthesisError:
+            raise
         except Exception as exc:  # pragma: no cover - exact network exceptions depend on adapter/runtime.
             raise VoiceSynthesisError(str(exc)) from exc
 
@@ -108,3 +126,7 @@ class FakeAudioPlayer:
 
     def play(self, audio: SpeechAudio) -> None:
         self.audios.append(audio)
+
+    @property
+    def last_audio(self) -> SpeechAudio | None:
+        return self.audios[-1] if self.audios else None
