@@ -34,6 +34,7 @@ from yorumiya_commentary import (
     VideoInput,
     VoiceActivityDetector,
     VoiceActivityPolicy,
+    VoiceSynthesisError,
     WhisperTranscriber,
     comment_to_speech_item,
 )
@@ -302,7 +303,15 @@ class CorePipelineTest(unittest.TestCase):
 
         self.assertTrue(result.played)
         self.assertEqual(player.audios[0], audio)
+        self.assertEqual(player.last_audio, audio)
+        self.assertEqual(result.as_dict()["audio_format"], "fake-wav")
         self.assertEqual(pipeline.run_playback_step().skipped_reason, "no_audio")
+
+    def test_voice_synthesis_error_keeps_adapter_context(self):
+        error = VoiceSynthesisError("down", adapter="voicevox")
+
+        self.assertEqual(str(error), "down")
+        self.assertEqual(error.adapter, "voicevox")
 
     def test_process_frame_step_exposes_decision_speech_and_audio(self):
         frame = next(
