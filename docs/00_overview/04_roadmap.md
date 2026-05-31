@@ -2,6 +2,8 @@
 
 Roadmap は milestone ごとに system の責務を広げる。
 
+Current implementation status is summarized in `05_milestone_status.md`.
+
 ## M1: Documentation Foundation
 
 - overview / requirements / architecture を整理する。
