@@ -14,6 +14,10 @@
 
 サービスは sleep、thread、signal handler を直接持たない。それらは application layer で扱い、core は deterministic にテストできる状態を保つ。
 
+`run(..., stop_when_done=True)` は finite run の最後に `stop()` を呼ぶ。テストや batch 実験ではこの形を使い、常時実行に近い利用では `run_forever()` を使う。
+
+`snapshot()` は file recorder path も返す。これにより service の状態、metrics、trace 件数、queue 状態を debug UI や monitoring adapter へ渡せる。
+
 ## Metrics
 
 `RuntimeMetrics` は tick 数、frame step 数、speech step 数、comment 数、suppression 数、synthesized 数、error 数を集計する。

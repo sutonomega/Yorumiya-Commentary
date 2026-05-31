@@ -647,6 +647,10 @@ class RuntimeService:
     def stop(self) -> None:
         self.running = False
 
+    @property
+    def is_running(self) -> bool:
+        return self.running
+
     def step(self, tick: RuntimeTick) -> RuntimeTickResult | None:
         if not self.running:
             return None
@@ -657,20 +661,33 @@ class RuntimeService:
             self.file_recorder.write([trace])
         return result
 
-    def run(self, ticks: Iterable[RuntimeTick], max_ticks: int | None = None) -> list[RuntimeTickResult]:
+    def run(
+        self,
+        ticks: Iterable[RuntimeTick],
+        max_ticks: int | None = None,
+        stop_when_done: bool = False,
+    ) -> list[RuntimeTickResult]:
         self.start()
         results: list[RuntimeTickResult] = []
-        for tick in ticks:
-            if max_ticks is not None and len(results) >= max_ticks:
-                break
-            result = self.step(tick)
-            if result is None:
-                break
-            results.append(result)
+        try:
+            for tick in ticks:
+                if max_ticks is not None and len(results) >= max_ticks:
+                    break
+                result = self.step(tick)
+                if result is None:
+                    break
+                results.append(result)
+        finally:
+            if stop_when_done:
+                self.stop()
         return results
 
-    def run_forever(self, tick_source: Iterable[RuntimeTick], max_ticks: int | None = None) -> list[RuntimeTickResult]:
-        return self.run(tick_source, max_ticks=max_ticks)
+    def run_forever(
+        self,
+        tick_source: Iterable[RuntimeTick],
+        max_ticks: int | None = None,
+    ) -> list[RuntimeTickResult]:
+        return self.run(tick_source, max_ticks=max_ticks, stop_when_done=False)
 
     def snapshot(self) -> dict[str, object]:
         return {
@@ -678,6 +695,7 @@ class RuntimeService:
             "metrics": self.metrics.as_dict(),
             "queue": self.loop.pipeline.queue.state(),
             "traces": len(self.recorder.traces),
+            "file_recorder": str(self.file_recorder.path) if self.file_recorder else None,
         }
 
 
