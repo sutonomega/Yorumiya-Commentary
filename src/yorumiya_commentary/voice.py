@@ -14,6 +14,22 @@ class SpeechSynthesizer(Protocol):
         ...
 
 
+class AudioPlayer(Protocol):
+    def play(self, audio: SpeechAudio) -> None:
+        ...
+
+
+class VoiceSynthesisError(RuntimeError):
+    pass
+
+
+@dataclass(frozen=True)
+class PlaybackResult:
+    audio: SpeechAudio | None = None
+    played: bool = False
+    skipped_reason: str | None = None
+
+
 @dataclass(frozen=True)
 class SpeechStyle:
     speaker: int = 3
@@ -63,11 +79,14 @@ class VoicevoxSynthesizer:
         self.client = client or VoicevoxClient()
 
     def synthesize(self, item: SpeechItem) -> SpeechAudio:
-        query = self.client.audio_query(item.text, item.speaker)
-        query["speedScale"] = item.speed_scale
-        query["volumeScale"] = item.volume_scale
-        audio = self.client.synthesis(query, item.speaker)
-        return SpeechAudio(timestamp=item.timestamp, text=item.text, audio=audio)
+        try:
+            query = self.client.audio_query(item.text, item.speaker)
+            query["speedScale"] = item.speed_scale
+            query["volumeScale"] = item.volume_scale
+            audio = self.client.synthesis(query, item.speaker)
+            return SpeechAudio(timestamp=item.timestamp, text=item.text, audio=audio)
+        except Exception as exc:  # pragma: no cover - exact network exceptions depend on adapter/runtime.
+            raise VoiceSynthesisError(str(exc)) from exc
 
 
 class FakeVoiceSynthesizer:
@@ -81,3 +100,11 @@ class FakeVoiceSynthesizer:
         self.items.append(item)
         audio = self.audio_prefix + item.text.encode("utf-8")
         return SpeechAudio(timestamp=item.timestamp, text=item.text, audio=audio, format="fake-wav")
+
+
+class FakeAudioPlayer:
+    def __init__(self):
+        self.audios: list[SpeechAudio] = []
+
+    def play(self, audio: SpeechAudio) -> None:
+        self.audios.append(audio)

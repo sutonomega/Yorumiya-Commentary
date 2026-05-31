@@ -20,26 +20,36 @@ Roadmap は milestone ごとに system の責務を広げる。
 
 M2 の目的は「frame から発話候補まで流れること」を確認すること。
 
-## M3: Audio Understanding
+## M3: Realtime Foundation
 
-- Whisper integration
-- VAD integration
-- audio analyzer
-- atmosphere estimation
-- speech timing suppression
+- RealtimeScheduler
+- run_due_steps()
+- RealtimeLoop
+- RuntimeTick
+- RuntimeTickResult
+- PipelineTrace
+- SpeechTrace
+- RuntimeTickTrace
+- RuntimeTraceRecorder
+- JSONL export
 
-M3 の目的は「音声情報で喋る/黙る判断を改善すること」。
+M3 の目的は「リアルタイム実行と観測の基盤を構築すること」。
 
-## M4: Runtime Stability
+Status: complete.
 
-- realtime scheduler
-- queue system
-- logging
-- error handling
-- config system
-- latency measurement
+## M4: Audio Understanding
 
-M4 の目的は「長く動かしても判断を追えること」。
+- AudioAnalyzer
+- VoiceActivityDetector
+- WhisperTranscriber
+- transcript suppression
+- AudioEventDetector
+- EventSelectionTrace
+- event source tracking
+
+M4 の目的は「音声情報を実況判断へ統合すること」。
+
+Status: in progress. Transcript event detection and event source tracking are available; Whisper/VAD/audio-event tuning and richer audio understanding remain.
 
 ## M5: Companion AI
 
@@ -50,3 +60,29 @@ M4 の目的は「長く動かしても判断を追えること」。
 - memory-aware response
 
 M5 の目的は「一緒に過ごしている存在感」を作ること。
+
+Status: foundation. Memory persistence, conversation turns, and emotion-aware responses exist; richer companion behavior is still future work.
+
+## M6: Voice Integration
+
+- VoicevoxSynthesizer
+- VoicevoxClient
+- Speech queue integration
+- voice trace
+
+M6 の目的は「実際の音声合成エンジンと接続すること」。
+
+Status: foundation. VOICEVOX adapter boundary, fake voice, playback boundary, and failure handling exist; live engine validation and playback integration remain.
+
+## M7: Production Runtime
+
+- while running loop
+- runtime service
+- graceful shutdown
+- runtime metrics
+- file recorder
+- monitoring
+
+M7 の目的は「常時稼働可能な realtime runtime を完成させること」。
+
+Status: foundation. RuntimeService, metrics, graceful stop, and file trace recording exist; long-running service operations and monitoring remain.

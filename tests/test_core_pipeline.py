@@ -12,7 +12,10 @@ from yorumiya_commentary import (
     CompanionMode,
     EventDetector,
     EventSelectionTrace,
+    EmotionEstimator,
+    FakeAudioPlayer,
     FakeVoiceSynthesizer,
+    FileTraceRecorder,
     FrameFileInput,
     FrameSampler,
     FrameSamplingPolicy,
@@ -21,10 +24,12 @@ from yorumiya_commentary import (
     RealtimeScheduler,
     RuntimeTick,
     RuntimeTraceRecorder,
+    RuntimeService,
     SceneAnalyzer,
     SpeechQueuePolicy,
     SpeechStyle,
     TaskQueue,
+    TranscriptEventDetector,
     TranscriptPolicy,
     VideoInput,
     VoiceActivityDetector,
@@ -32,7 +37,7 @@ from yorumiya_commentary import (
     WhisperTranscriber,
     comment_to_speech_item,
 )
-from yorumiya_commentary.models import AudioChunk, Comment, CommentaryContext, CommentaryEvent, SpeechItem, Transcript, VadResult
+from yorumiya_commentary.models import AudioChunk, Comment, CommentaryContext, CommentaryEvent, SpeechAudio, SpeechItem, Transcript, VadResult
 
 
 class CorePipelineTest(unittest.TestCase):
@@ -273,6 +278,32 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(result.speech_audio.text, "hello")
         self.assertEqual(pipeline.queue.state()["speech"], 0)
 
+    def test_run_speech_step_reports_voice_failure_without_crashing(self):
+        class BrokenVoice:
+            def synthesize(self, item):
+                raise RuntimeError("voice down")
+
+        pipeline = RealtimePipeline(voice_synthesizer=BrokenVoice())
+        pipeline.queue.put_speech(SpeechItem(timestamp=2.0, text="hello"))
+
+        result = pipeline.run_speech_step(now=2.0)
+
+        self.assertEqual(result.skipped_reason, "voice_synthesis_failed")
+        self.assertEqual(result.speech_item.text, "hello")
+        self.assertIsNone(result.speech_audio)
+        self.assertIn("voice down", result.error)
+
+    def test_runtime_playback_step_uses_audio_player_adapter(self):
+        player = FakeAudioPlayer()
+        pipeline = RealtimePipeline(audio_player=player)
+        audio = SpeechAudio(timestamp=1.0, text="hello", audio=b"wav", format="fake-wav")
+
+        result = pipeline.run_playback_step(audio)
+
+        self.assertTrue(result.played)
+        self.assertEqual(player.audios[0], audio)
+        self.assertEqual(pipeline.run_playback_step().skipped_reason, "no_audio")
+
     def test_process_frame_step_exposes_decision_speech_and_audio(self):
         frame = next(
             VideoInput(
@@ -494,6 +525,81 @@ class CorePipelineTest(unittest.TestCase):
         self.assertTrue(rows[0]["speech_trace"]["synthesized"])
         self.assertEqual(rows[1]["speech_trace"]["skipped_reason"], "no_speech")
 
+    def test_runtime_service_records_metrics_and_stops_gracefully(self):
+        frame = next(
+            VideoInput(
+                [
+                    {
+                        "summary": "menu opened",
+                        "labels": ["menu"],
+                        "ui_elements": ["menu"],
+                        "confidence": 0.8,
+                    }
+                ],
+                fps=1,
+            ).iter_frames()
+        )
+        service = RuntimeService(
+            loop=RealtimeLoop(
+                pipeline=RealtimePipeline(voice_synthesizer=FakeVoiceSynthesizer()),
+                scheduler=RealtimeScheduler(frame_interval=1.0, speech_interval=0.5),
+            )
+        )
+
+        results = service.run([RuntimeTick(timestamp=0.0, frame=frame), RuntimeTick(timestamp=0.5)])
+        service.stop()
+        skipped = service.step(RuntimeTick(timestamp=1.0, frame=frame))
+
+        self.assertEqual(len(results), 2)
+        self.assertIsNone(skipped)
+        self.assertFalse(service.snapshot()["running"])
+        self.assertEqual(service.metrics.ticks, 2)
+        self.assertEqual(service.metrics.frame_steps, 1)
+        self.assertEqual(service.metrics.speech_steps, 2)
+        self.assertGreaterEqual(service.metrics.synthesized, 1)
+        self.assertEqual(service.snapshot()["traces"], 2)
+
+    def test_file_trace_recorder_appends_jsonl(self):
+        trace = RealtimeLoop().step(RuntimeTick(timestamp=0.0)).to_trace()
+
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "runtime" / "trace.jsonl"
+            written = FileTraceRecorder(path).write([trace])
+            rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+
+        self.assertEqual(written, 1)
+        self.assertEqual(rows[0]["timestamp"], 0.0)
+        self.assertIn("frame_due", rows[0])
+
+    def test_realtime_loop_runs_and_records_runtime_traces(self):
+        frame = next(
+            VideoInput(
+                [
+                    {
+                        "summary": "menu opened",
+                        "labels": ["menu"],
+                        "ui_elements": ["menu"],
+                        "confidence": 0.8,
+                    }
+                ],
+                fps=1,
+            ).iter_frames()
+        )
+        loop = RealtimeLoop(
+            pipeline=RealtimePipeline(voice_synthesizer=FakeVoiceSynthesizer()),
+            scheduler=RealtimeScheduler(frame_interval=1.0, speech_interval=0.5),
+        )
+
+        recorder = loop.run_recorded([RuntimeTick(timestamp=0.0, frame=frame), RuntimeTick(timestamp=0.5)])
+        rows = [json.loads(line) for line in recorder.to_jsonl().splitlines()]
+
+        self.assertEqual(len(rows), 2)
+        self.assertTrue(rows[0]["frame_due"])
+        self.assertEqual(rows[0]["frame_trace"]["event_source"], "scene")
+        self.assertTrue(rows[0]["speech_trace"]["synthesized"])
+        self.assertFalse(rows[1]["frame_due"])
+        self.assertEqual(rows[1]["speech_trace"]["skipped_reason"], "no_speech")
+
     def test_audio_context_trace_records_audio_vad_and_transcript_state(self):
         frame = next(VideoInput(["battle critical hit"], fps=1).iter_frames())
         chunk = AudioChunk(timestamp=0.0, samples=(0.0, 0.4, 0.5, 0.2), sample_rate=4)
@@ -581,6 +687,18 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(event.metadata["source"], "audio")
         self.assertEqual(event.metadata["audio_event"], "impact")
 
+    def test_transcript_event_detector_creates_commentary_event_without_raw_text(self):
+        transcript = Transcript(timestamp=4.0, text="boss is coming", start=4.0, end=5.25, confidence=0.9)
+
+        event = TranscriptEventDetector().detect(transcript)
+
+        self.assertEqual(event.kind, "transcript_signal")
+        self.assertEqual(event.metadata["source"], "transcript")
+        self.assertEqual(event.metadata["confidence"], 0.9)
+        self.assertEqual(event.metadata["text_length"], len("boss is coming"))
+        self.assertNotIn("text", event.metadata)
+        self.assertFalse(event.should_speak)
+
     def test_realtime_pipeline_uses_audio_event_when_more_salient_than_scene_event(self):
         frame = next(VideoInput(["quiet field"], fps=1).iter_frames())
         chunk = AudioChunk(timestamp=0.0, samples=(0.0, 0.9, 0.1), sample_rate=3)
@@ -620,6 +738,41 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(audio_trace.event_source, "audio")
         self.assertEqual(audio_trace.as_dict()["event_source"], "audio")
 
+    def test_realtime_pipeline_records_transcript_event_selection(self):
+        frame = next(
+            VideoInput(
+                [
+                    {
+                        "summary": "quiet field",
+                        "labels": ["field"],
+                        "confidence": 0.1,
+                    }
+                ],
+                fps=1,
+            ).iter_frames()
+        )
+        chunk = AudioChunk(timestamp=0.0, samples=(0.0, 0.01, 0.0), sample_rate=3)
+        transcriber = WhisperTranscriber(
+            adapter=lambda audio: Transcript(
+                timestamp=audio.timestamp,
+                text="player speaking",
+                start=audio.timestamp,
+                end=audio.timestamp + 1.0,
+                confidence=0.95,
+            )
+        )
+
+        trace = RealtimePipeline(transcriber=transcriber).process_frame_step(frame, audio=chunk).to_trace()
+
+        self.assertEqual(trace.event_kind, "transcript_signal")
+        self.assertEqual(trace.event_source, "transcript")
+        self.assertEqual(trace.decision_reason, "transcript_speech")
+        self.assertTrue(trace.suppressed)
+        self.assertEqual(trace.event_selection.selected_source, "transcript")
+        self.assertEqual(trace.event_selection.reason, "transcript_higher_salience")
+        self.assertEqual(trace.event_selection.transcript_event_kind, "transcript_signal")
+        self.assertEqual(trace.as_dict()["event_selection"]["transcript_event_kind"], "transcript_signal")
+
     def test_realtime_pipeline_merges_audio_into_context(self):
         frame = next(VideoInput(["battle critical hit"], fps=1).iter_frames())
         chunk = AudioChunk(timestamp=0.0, samples=(0.0, 0.4, 0.5, 0.2), sample_rate=4)
@@ -640,6 +793,36 @@ class CorePipelineTest(unittest.TestCase):
 
         self.assertEqual(first.reason, "companion")
         self.assertIn("ボス戦", second.text)
+
+    def test_companion_mode_persists_memory_and_conversation_context(self):
+        companion = CompanionMode()
+        companion.switch(True)
+        context = CommentaryContext(
+            timestamp=3.0,
+            event=CommentaryEvent(timestamp=3.0, kind="audio_impact", description="Boss roar", salience=0.9, should_speak=True),
+            emotion=EmotionEstimator().estimate(
+                CommentaryContext(
+                    timestamp=3.0,
+                    event=CommentaryEvent(timestamp=3.0, kind="audio_impact", description="Boss roar", salience=0.9, should_speak=True),
+                )
+            ),
+        )
+
+        comment = companion.respond("この盛り上がりを覚えて", context=context)
+
+        self.assertEqual(comment.timestamp, 3.0)
+        self.assertGreater(comment.priority, 0.0)
+        self.assertEqual(companion.emotion.emotion, "interested")
+        self.assertEqual(companion.conversation_context()[0].user_text, "この盛り上がりを覚えて")
+        self.assertIn("Boss roar", companion.memory.recall("Boss"))
+
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "memory.json"
+            companion.memory.save_long_memory(path)
+            restored = CompanionMode()
+            restored.memory.load_long_memory(path)
+
+        self.assertIn("この盛り上がりを覚えて", restored.memory.recall("盛り上がり"))
 
 
 if __name__ == "__main__":

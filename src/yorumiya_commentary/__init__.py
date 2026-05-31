@@ -1,10 +1,12 @@
 """Yorumiya Commentary core package."""
 
-from .ai import CommentDecision, CommentGenerator, CommentPolicy, CompanionMode, EmotionEstimator, MemoryStore
+from .ai import CommentDecision, CommentGenerator, CommentPolicy, CompanionMode, ConversationTurn, EmotionEstimator, MemoryStore
 from .audio import (
     AudioAnalyzer,
     AudioEventDetectionPolicy,
     AudioEventDetector,
+    TranscriptEventDetectionPolicy,
+    TranscriptEventDetector,
     TranscriptPolicy,
     VoiceActivityDetector,
     VoiceActivityPolicy,
@@ -14,6 +16,7 @@ from .event import EventDetectionConfig, EventDetector
 from .runtime import (
     AudioContextTrace,
     EventSelectionTrace,
+    FileTraceRecorder,
     PipelineStepResult,
     PipelineTrace,
     RealtimeLoop,
@@ -23,6 +26,8 @@ from .runtime import (
     RuntimeTickResult,
     RuntimeTickTrace,
     RuntimeTraceRecorder,
+    RuntimeMetrics,
+    RuntimeService,
     SpeechQueuePolicy,
     SpeechStepResult,
     SpeechTrace,
@@ -30,26 +35,41 @@ from .runtime import (
 )
 from .scene import SceneAnalysisConfig, SceneAnalyzer
 from .video import FrameFileInput, FrameSampler, FrameSamplingPolicy, VideoInput
-from .voice import FakeVoiceSynthesizer, SpeechStyle, VoicevoxClient, VoicevoxSynthesizer, comment_to_speech_item
+from .voice import (
+    AudioPlayer,
+    FakeAudioPlayer,
+    FakeVoiceSynthesizer,
+    PlaybackResult,
+    SpeechStyle,
+    VoiceSynthesisError,
+    VoicevoxClient,
+    VoicevoxSynthesizer,
+    comment_to_speech_item,
+)
 
 __all__ = [
     "AudioAnalyzer",
     "AudioContextTrace",
+    "AudioPlayer",
     "AudioEventDetectionPolicy",
     "AudioEventDetector",
     "CommentGenerator",
     "CommentDecision",
     "CommentPolicy",
     "CompanionMode",
+    "ConversationTurn",
     "EmotionEstimator",
     "EventDetectionConfig",
     "EventDetector",
     "EventSelectionTrace",
+    "FileTraceRecorder",
     "FrameFileInput",
     "FrameSampler",
     "FrameSamplingPolicy",
+    "FakeAudioPlayer",
     "FakeVoiceSynthesizer",
     "MemoryStore",
+    "PlaybackResult",
     "PipelineStepResult",
     "PipelineTrace",
     "RealtimeLoop",
@@ -59,6 +79,8 @@ __all__ = [
     "RuntimeTickResult",
     "RuntimeTickTrace",
     "RuntimeTraceRecorder",
+    "RuntimeMetrics",
+    "RuntimeService",
     "SceneAnalysisConfig",
     "SceneAnalyzer",
     "SpeechQueuePolicy",
@@ -66,10 +88,13 @@ __all__ = [
     "SpeechTrace",
     "SpeechStyle",
     "TaskQueue",
+    "TranscriptEventDetectionPolicy",
+    "TranscriptEventDetector",
     "TranscriptPolicy",
     "VideoInput",
     "VoiceActivityDetector",
     "VoiceActivityPolicy",
+    "VoiceSynthesisError",
     "VoicevoxClient",
     "VoicevoxSynthesizer",
     "WhisperTranscriber",

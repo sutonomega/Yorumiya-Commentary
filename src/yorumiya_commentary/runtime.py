@@ -4,15 +4,16 @@ import json
 from collections import deque
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
+from pathlib import Path
 from time import monotonic
 from typing import Any
 
 from .ai import CommentDecision, CommentGenerator, EmotionEstimator
-from .audio import AudioAnalyzer, AudioEventDetector, VoiceActivityDetector, WhisperTranscriber
+from .audio import AudioAnalyzer, AudioEventDetector, TranscriptEventDetector, VoiceActivityDetector, WhisperTranscriber
 from .event import EventDetector
 from .models import AudioChunk, CommentaryContext, CommentaryEvent, Frame, SpeechAudio, SpeechItem
 from .scene import SceneAnalyzer
-from .voice import SpeechStyle, SpeechSynthesizer, comment_to_speech_item
+from .voice import AudioPlayer, PlaybackResult, SpeechStyle, SpeechSynthesizer, comment_to_speech_item
 
 
 @dataclass(frozen=True)
@@ -81,6 +82,8 @@ class EventSelectionTrace:
     scene_event_salience: float | None = None
     audio_event_kind: str | None = None
     audio_event_salience: float | None = None
+    transcript_event_kind: str | None = None
+    transcript_event_salience: float | None = None
 
     @classmethod
     def from_events(
@@ -88,25 +91,32 @@ class EventSelectionTrace:
         scene_event: CommentaryEvent | None,
         audio_event: CommentaryEvent | None,
         selected: CommentaryEvent | None,
+        transcript_event: CommentaryEvent | None = None,
     ) -> "EventSelectionTrace":
-        if scene_event is None and audio_event is None:
+        events = {"scene": scene_event, "audio": audio_event, "transcript": transcript_event}
+        present_sources = [source for source, event in events.items() if event is not None]
+        selected_source = selected.metadata.get("source", "scene") if selected else None
+
+        if not present_sources:
             reason = "no_event"
-        elif scene_event is None:
-            reason = "audio_only"
-        elif audio_event is None:
-            reason = "scene_only"
-        elif selected is audio_event:
+        elif len(present_sources) == 1:
+            reason = f"{present_sources[0]}_only"
+        elif selected_source == "audio":
             reason = "audio_higher_salience"
+        elif selected_source == "transcript":
+            reason = "transcript_higher_salience"
         else:
             reason = "scene_higher_or_equal_salience"
         return cls(
             selected_kind=selected.kind if selected else None,
-            selected_source=selected.metadata.get("source", "scene") if selected else None,
+            selected_source=selected_source,
             reason=reason,
             scene_event_kind=scene_event.kind if scene_event else None,
             scene_event_salience=scene_event.salience if scene_event else None,
             audio_event_kind=audio_event.kind if audio_event else None,
             audio_event_salience=audio_event.salience if audio_event else None,
+            transcript_event_kind=transcript_event.kind if transcript_event else None,
+            transcript_event_salience=transcript_event.salience if transcript_event else None,
         )
 
     def as_dict(self) -> dict[str, object]:
@@ -118,6 +128,8 @@ class EventSelectionTrace:
             "scene_event_salience": self.scene_event_salience,
             "audio_event_kind": self.audio_event_kind,
             "audio_event_salience": self.audio_event_salience,
+            "transcript_event_kind": self.transcript_event_kind,
+            "transcript_event_salience": self.transcript_event_salience,
         }
 
 
@@ -231,6 +243,7 @@ class SpeechStepResult:
     speech_item: SpeechItem | None = None
     speech_audio: SpeechAudio | None = None
     skipped_reason: str | None = None
+    error: str | None = None
 
     @property
     def synthesized(self) -> bool:
@@ -242,6 +255,7 @@ class SpeechTrace:
     timestamp: float
     synthesized: bool
     skipped_reason: str | None
+    error: str | None
     has_speech_item: bool
     has_speech_audio: bool
     speech_timestamp: float | None = None
@@ -253,6 +267,7 @@ class SpeechTrace:
             timestamp=timestamp,
             synthesized=result.synthesized,
             skipped_reason=result.skipped_reason,
+            error=result.error,
             has_speech_item=result.speech_item is not None,
             has_speech_audio=result.speech_audio is not None,
             speech_timestamp=result.speech_item.timestamp if result.speech_item else None,
@@ -264,6 +279,7 @@ class SpeechTrace:
             "timestamp": self.timestamp,
             "synthesized": self.synthesized,
             "skipped_reason": self.skipped_reason,
+            "error": self.error,
             "has_speech_item": self.has_speech_item,
             "has_speech_audio": self.has_speech_audio,
             "speech_timestamp": self.speech_timestamp,
@@ -339,6 +355,59 @@ class RuntimeTraceRecorder:
         return "\n".join(lines) + "\n"
 
 
+@dataclass
+class RuntimeMetrics:
+    ticks: int = 0
+    frame_steps: int = 0
+    speech_steps: int = 0
+    comments: int = 0
+    suppressions: int = 0
+    synthesized: int = 0
+    errors: int = 0
+
+    def record(self, result: RuntimeTickResult) -> None:
+        self.ticks += 1
+        if result.frame_step:
+            self.frame_steps += 1
+            if result.frame_step.comment_decision.comment:
+                self.comments += 1
+            if result.frame_step.comment_decision.suppressed:
+                self.suppressions += 1
+        if result.speech_step:
+            self.speech_steps += 1
+            if result.speech_step.synthesized:
+                self.synthesized += 1
+            if result.speech_step.error:
+                self.errors += 1
+
+    def as_dict(self) -> dict[str, int]:
+        return {
+            "ticks": self.ticks,
+            "frame_steps": self.frame_steps,
+            "speech_steps": self.speech_steps,
+            "comments": self.comments,
+            "suppressions": self.suppressions,
+            "synthesized": self.synthesized,
+            "errors": self.errors,
+        }
+
+
+@dataclass(frozen=True)
+class FileTraceRecorder:
+    path: Path | str
+
+    def write(self, traces: Iterable[RuntimeTickTrace]) -> int:
+        rows = [json.dumps(trace.as_dict(), ensure_ascii=False) for trace in traces]
+        if not rows:
+            return 0
+        target = Path(self.path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with target.open("a", encoding="utf-8") as file:
+            for row in rows:
+                file.write(row + "\n")
+        return len(rows)
+
+
 @dataclass(frozen=True)
 class RuntimeTick:
     timestamp: float
@@ -373,11 +442,13 @@ class RealtimePipeline:
         comment_generator: CommentGenerator | None = None,
         audio_analyzer: AudioAnalyzer | None = None,
         audio_event_detector: AudioEventDetector | None = None,
+        transcript_event_detector: TranscriptEventDetector | None = None,
         vad: VoiceActivityDetector | None = None,
         transcriber: WhisperTranscriber | None = None,
         queue: TaskQueue | None = None,
         speech_style: SpeechStyle | None = None,
         voice_synthesizer: SpeechSynthesizer | None = None,
+        audio_player: AudioPlayer | None = None,
     ):
         self.scene_analyzer = scene_analyzer or SceneAnalyzer()
         self.event_detector = event_detector or EventDetector()
@@ -385,11 +456,13 @@ class RealtimePipeline:
         self.comment_generator = comment_generator or CommentGenerator()
         self.audio_analyzer = audio_analyzer or AudioAnalyzer()
         self.audio_event_detector = audio_event_detector or AudioEventDetector()
+        self.transcript_event_detector = transcript_event_detector or TranscriptEventDetector()
         self.vad = vad or VoiceActivityDetector()
         self.transcriber = transcriber or WhisperTranscriber()
         self.queue = queue or TaskQueue()
         self.speech_style = speech_style or SpeechStyle()
         self.voice_synthesizer = voice_synthesizer
+        self.audio_player = audio_player
 
     def process_frame(self, frame: Frame, audio: AudioChunk | None = None) -> CommentaryContext:
         return self.process_frame_step(frame, audio).context
@@ -452,10 +525,11 @@ class RealtimePipeline:
         scene_event = self.event_detector.detect(scene)
         audio_features = self.audio_analyzer.analyze(audio) if audio else None
         audio_event = self.audio_event_detector.detect(audio_features)
-        event = self._select_event(scene_event, audio_event)
-        event_selection = EventSelectionTrace.from_events(scene_event, audio_event, event)
         vad_result = self.vad.detect(audio) if audio else None
         transcript = self.transcriber.transcribe(audio) if audio else None
+        transcript_event = self.transcript_event_detector.detect(transcript)
+        event = self._select_event(scene_event, audio_event, transcript_event)
+        event_selection = EventSelectionTrace.from_events(scene_event, audio_event, event, transcript_event)
         context = CommentaryContext(
             timestamp=frame.timestamp,
             scene=scene,
@@ -482,12 +556,13 @@ class RealtimePipeline:
         self,
         scene_event: CommentaryEvent | None,
         audio_event: CommentaryEvent | None,
+        transcript_event: CommentaryEvent | None = None,
     ) -> CommentaryEvent | None:
-        if scene_event is None:
-            return audio_event
-        if audio_event is None:
-            return scene_event
-        return audio_event if audio_event.salience > scene_event.salience else scene_event
+        selected = scene_event or audio_event or transcript_event
+        for event in (audio_event, transcript_event):
+            if event is not None and (selected is None or event.salience > selected.salience):
+                selected = event
+        return selected
 
     def run_once(self, frame: Frame, on_speech: Callable[[SpeechItem], None] | None = None) -> CommentaryContext:
         context = self.process_frame(frame)
@@ -505,7 +580,18 @@ class RealtimePipeline:
         speech = self.queue.get_speech(now=now)
         if speech is None:
             return SpeechStepResult(skipped_reason="no_speech")
-        return SpeechStepResult(speech_item=speech, speech_audio=self.voice_synthesizer.synthesize(speech))
+        try:
+            return SpeechStepResult(speech_item=speech, speech_audio=self.voice_synthesizer.synthesize(speech))
+        except Exception as exc:
+            return SpeechStepResult(speech_item=speech, skipped_reason="voice_synthesis_failed", error=str(exc))
+
+    def run_playback_step(self, audio: SpeechAudio | None = None) -> PlaybackResult:
+        if self.audio_player is None:
+            return PlaybackResult(audio=audio, skipped_reason="no_audio_player")
+        if audio is None:
+            return PlaybackResult(skipped_reason="no_audio")
+        self.audio_player.play(audio)
+        return PlaybackResult(audio=audio, played=True)
 
 
 @dataclass
@@ -524,5 +610,59 @@ class RealtimeLoop:
     def run(self, ticks: Iterable[RuntimeTick]) -> list[RuntimeTickResult]:
         return [self.step(tick) for tick in ticks]
 
+    def run_recorded(self, ticks: Iterable[RuntimeTick], recorder: RuntimeTraceRecorder | None = None) -> RuntimeTraceRecorder:
+        resolved = recorder or RuntimeTraceRecorder()
+        for tick in ticks:
+            resolved.record(self.step(tick))
+        return resolved
+
     def run_frames(self, frames: Iterable[Frame]) -> list[RuntimeTickResult]:
         return [self.step(RuntimeTick(timestamp=frame.timestamp, frame=frame)) for frame in frames]
+
+
+@dataclass
+class RuntimeService:
+    loop: RealtimeLoop = field(default_factory=RealtimeLoop)
+    recorder: RuntimeTraceRecorder = field(default_factory=RuntimeTraceRecorder)
+    metrics: RuntimeMetrics = field(default_factory=RuntimeMetrics)
+    file_recorder: FileTraceRecorder | None = None
+    running: bool = False
+
+    def start(self) -> None:
+        self.running = True
+
+    def stop(self) -> None:
+        self.running = False
+
+    def step(self, tick: RuntimeTick) -> RuntimeTickResult | None:
+        if not self.running:
+            return None
+        result = self.loop.step(tick)
+        trace = self.recorder.record(result)
+        self.metrics.record(result)
+        if self.file_recorder:
+            self.file_recorder.write([trace])
+        return result
+
+    def run(self, ticks: Iterable[RuntimeTick], max_ticks: int | None = None) -> list[RuntimeTickResult]:
+        self.start()
+        results: list[RuntimeTickResult] = []
+        for tick in ticks:
+            if max_ticks is not None and len(results) >= max_ticks:
+                break
+            result = self.step(tick)
+            if result is None:
+                break
+            results.append(result)
+        return results
+
+    def run_forever(self, tick_source: Iterable[RuntimeTick], max_ticks: int | None = None) -> list[RuntimeTickResult]:
+        return self.run(tick_source, max_ticks=max_ticks)
+
+    def snapshot(self) -> dict[str, object]:
+        return {
+            "running": self.running,
+            "metrics": self.metrics.as_dict(),
+            "queue": self.loop.pipeline.queue.state(),
+            "traces": len(self.recorder.traces),
+        }
