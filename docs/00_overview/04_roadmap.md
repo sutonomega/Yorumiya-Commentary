@@ -49,7 +49,7 @@ Status: complete.
 
 M4 の目的は「音声情報を実況判断へ統合すること」。
 
-Status: in progress.
+Status: complete.
 
 ## M5: Companion AI
 
