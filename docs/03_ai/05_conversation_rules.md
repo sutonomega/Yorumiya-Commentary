@@ -19,6 +19,25 @@
 
 `CompanionMode.respond()` は user text、memory recall、latest emotion を使って短い response を返し、会話履歴を `ConversationTurn` として保持する。
 
+## M5 Scope
+
+M5 の土台で扱うもの:
+
+- long memory の保存 / 読み込み。
+- conversation turns の保持。
+- latest emotion state の保持。
+- user text と memory を使った短い response。
+
+M5 の土台では扱わないもの:
+
+- embedding search。
+- LLM による長期要約。
+- multi-user profile。
+- autonomous companion behavior。
+- speech scheduling の高度な personality 制御。
+
+これらは Companion AI の本格実装フェーズで adapter / application layer として追加する。
+
 ## MVP Commentary Rules
 
 - `ui_change` は UI の変化に短く触れる。

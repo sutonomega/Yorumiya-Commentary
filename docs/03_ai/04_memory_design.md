@@ -13,6 +13,8 @@ memory は short と long に分ける。
 
 `MemoryStore.load_long_memory()` は保存済み JSON を読み込み、既存の long memory に統合する。
 
+`MemoryStore.as_dict()` は short / long memory の現在状態を返す。これは runtime snapshot や debug UI で使うための軽量な表現で、永続化の canonical schema ではない。
+
 MVP では file path を受け取るだけに留める。SQLite、vector store、cloud sync は adapter / application layer で扱う。
 
 ## Summary
