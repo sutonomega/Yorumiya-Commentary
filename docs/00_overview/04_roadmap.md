@@ -85,4 +85,4 @@ Status: complete.
 
 M7 の目的は「常時稼働可能な realtime runtime を完成させること」。
 
-Status: planned.
+Status: complete.

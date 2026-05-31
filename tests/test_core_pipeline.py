@@ -15,6 +15,7 @@ from yorumiya_commentary import (
     EmotionEstimator,
     FakeAudioPlayer,
     FakeVoiceSynthesizer,
+    FileTraceRecorder,
     FrameFileInput,
     FrameSampler,
     FrameSamplingPolicy,
@@ -23,6 +24,7 @@ from yorumiya_commentary import (
     RealtimeScheduler,
     RuntimeTick,
     RuntimeTraceRecorder,
+    RuntimeService,
     SceneAnalyzer,
     SpeechQueuePolicy,
     SpeechStyle,
@@ -522,6 +524,52 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(rows[0]["frame_trace"]["event_kind"], "scene_initial")
         self.assertTrue(rows[0]["speech_trace"]["synthesized"])
         self.assertEqual(rows[1]["speech_trace"]["skipped_reason"], "no_speech")
+
+    def test_runtime_service_records_metrics_and_stops_gracefully(self):
+        frame = next(
+            VideoInput(
+                [
+                    {
+                        "summary": "menu opened",
+                        "labels": ["menu"],
+                        "ui_elements": ["menu"],
+                        "confidence": 0.8,
+                    }
+                ],
+                fps=1,
+            ).iter_frames()
+        )
+        service = RuntimeService(
+            loop=RealtimeLoop(
+                pipeline=RealtimePipeline(voice_synthesizer=FakeVoiceSynthesizer()),
+                scheduler=RealtimeScheduler(frame_interval=1.0, speech_interval=0.5),
+            )
+        )
+
+        results = service.run([RuntimeTick(timestamp=0.0, frame=frame), RuntimeTick(timestamp=0.5)])
+        service.stop()
+        skipped = service.step(RuntimeTick(timestamp=1.0, frame=frame))
+
+        self.assertEqual(len(results), 2)
+        self.assertIsNone(skipped)
+        self.assertFalse(service.snapshot()["running"])
+        self.assertEqual(service.metrics.ticks, 2)
+        self.assertEqual(service.metrics.frame_steps, 1)
+        self.assertEqual(service.metrics.speech_steps, 2)
+        self.assertGreaterEqual(service.metrics.synthesized, 1)
+        self.assertEqual(service.snapshot()["traces"], 2)
+
+    def test_file_trace_recorder_appends_jsonl(self):
+        trace = RealtimeLoop().step(RuntimeTick(timestamp=0.0)).to_trace()
+
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "runtime" / "trace.jsonl"
+            written = FileTraceRecorder(path).write([trace])
+            rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+
+        self.assertEqual(written, 1)
+        self.assertEqual(rows[0]["timestamp"], 0.0)
+        self.assertIn("frame_due", rows[0])
 
     def test_realtime_loop_runs_and_records_runtime_traces(self):
         frame = next(

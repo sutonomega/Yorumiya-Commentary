@@ -4,6 +4,7 @@ import json
 from collections import deque
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
+from pathlib import Path
 from time import monotonic
 from typing import Any
 
@@ -354,6 +355,59 @@ class RuntimeTraceRecorder:
         return "\n".join(lines) + "\n"
 
 
+@dataclass
+class RuntimeMetrics:
+    ticks: int = 0
+    frame_steps: int = 0
+    speech_steps: int = 0
+    comments: int = 0
+    suppressions: int = 0
+    synthesized: int = 0
+    errors: int = 0
+
+    def record(self, result: RuntimeTickResult) -> None:
+        self.ticks += 1
+        if result.frame_step:
+            self.frame_steps += 1
+            if result.frame_step.comment_decision.comment:
+                self.comments += 1
+            if result.frame_step.comment_decision.suppressed:
+                self.suppressions += 1
+        if result.speech_step:
+            self.speech_steps += 1
+            if result.speech_step.synthesized:
+                self.synthesized += 1
+            if result.speech_step.error:
+                self.errors += 1
+
+    def as_dict(self) -> dict[str, int]:
+        return {
+            "ticks": self.ticks,
+            "frame_steps": self.frame_steps,
+            "speech_steps": self.speech_steps,
+            "comments": self.comments,
+            "suppressions": self.suppressions,
+            "synthesized": self.synthesized,
+            "errors": self.errors,
+        }
+
+
+@dataclass(frozen=True)
+class FileTraceRecorder:
+    path: Path | str
+
+    def write(self, traces: Iterable[RuntimeTickTrace]) -> int:
+        rows = [json.dumps(trace.as_dict(), ensure_ascii=False) for trace in traces]
+        if not rows:
+            return 0
+        target = Path(self.path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with target.open("a", encoding="utf-8") as file:
+            for row in rows:
+                file.write(row + "\n")
+        return len(rows)
+
+
 @dataclass(frozen=True)
 class RuntimeTick:
     timestamp: float
@@ -564,3 +618,51 @@ class RealtimeLoop:
 
     def run_frames(self, frames: Iterable[Frame]) -> list[RuntimeTickResult]:
         return [self.step(RuntimeTick(timestamp=frame.timestamp, frame=frame)) for frame in frames]
+
+
+@dataclass
+class RuntimeService:
+    loop: RealtimeLoop = field(default_factory=RealtimeLoop)
+    recorder: RuntimeTraceRecorder = field(default_factory=RuntimeTraceRecorder)
+    metrics: RuntimeMetrics = field(default_factory=RuntimeMetrics)
+    file_recorder: FileTraceRecorder | None = None
+    running: bool = False
+
+    def start(self) -> None:
+        self.running = True
+
+    def stop(self) -> None:
+        self.running = False
+
+    def step(self, tick: RuntimeTick) -> RuntimeTickResult | None:
+        if not self.running:
+            return None
+        result = self.loop.step(tick)
+        trace = self.recorder.record(result)
+        self.metrics.record(result)
+        if self.file_recorder:
+            self.file_recorder.write([trace])
+        return result
+
+    def run(self, ticks: Iterable[RuntimeTick], max_ticks: int | None = None) -> list[RuntimeTickResult]:
+        self.start()
+        results: list[RuntimeTickResult] = []
+        for tick in ticks:
+            if max_ticks is not None and len(results) >= max_ticks:
+                break
+            result = self.step(tick)
+            if result is None:
+                break
+            results.append(result)
+        return results
+
+    def run_forever(self, tick_source: Iterable[RuntimeTick], max_ticks: int | None = None) -> list[RuntimeTickResult]:
+        return self.run(tick_source, max_ticks=max_ticks)
+
+    def snapshot(self) -> dict[str, object]:
+        return {
+            "running": self.running,
+            "metrics": self.metrics.as_dict(),
+            "queue": self.loop.pipeline.queue.state(),
+            "traces": len(self.recorder.traces),
+        }
