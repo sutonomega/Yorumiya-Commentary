@@ -12,10 +12,13 @@ class EventDetectionConfig:
     ui_weight: float = 0.22
     summary_change_weight: float = 0.2
     confidence_weight: float = 0.15
+    semantic_event_bonus: float = 0.25
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.speak_threshold <= 1.0:
             raise ValueError("speak_threshold must be between 0.0 and 1.0")
+        if not 0.0 <= self.semantic_event_bonus <= 1.0:
+            raise ValueError("semantic_event_bonus must be between 0.0 and 1.0")
 
 
 class EventDetector:
@@ -45,8 +48,9 @@ class EventDetector:
         ui_removed = sorted(previous_ui - current_ui)
         summary_changed = current.summary != self.previous.summary
         confidence_delta = max(0.0, current.confidence - self.previous.confidence)
-        salience = self._salience(added, removed, ui_added, ui_removed, summary_changed, confidence_delta)
-        kind = self._kind(added, removed, ui_added, ui_removed, summary_changed)
+        semantic_event = self._semantic_event(added, removed, ui_added, ui_removed, current)
+        salience = self._salience(added, removed, ui_added, ui_removed, summary_changed, confidence_delta, semantic_event is not None)
+        kind = semantic_event or self._kind(added, removed, ui_added, ui_removed, summary_changed)
         self.previous = current
 
         if salience <= 0:
@@ -66,6 +70,7 @@ class EventDetector:
                 "ui_removed": ui_removed,
                 "summary_changed": summary_changed,
                 "confidence_delta": confidence_delta,
+                "semantic_event": semantic_event,
             },
         )
 
@@ -77,12 +82,36 @@ class EventDetector:
         ui_removed: list[str],
         summary_changed: bool,
         confidence_delta: float,
+        has_semantic_event: bool = False,
     ) -> float:
         score = (len(added) + len(removed)) * self.config.label_weight
         score += (len(ui_added) + len(ui_removed)) * self.config.ui_weight
         score += self.config.summary_change_weight if summary_changed else 0.0
         score += confidence_delta * self.config.confidence_weight
+        score += self.config.semantic_event_bonus if has_semantic_event else 0.0
         return min(1.0, score)
+
+    def _semantic_event(
+        self,
+        added: list[str],
+        removed: list[str],
+        ui_added: list[str],
+        ui_removed: list[str],
+        current: SceneState,
+    ) -> str | None:
+        changed = set(added) | set(removed) | set(ui_added) | set(ui_removed)
+        current_labels = set(current.labels)
+        if changed & {"boss", "enemy", "battle", "combat"} and current_labels & {"boss", "enemy", "battle", "combat"}:
+            return "combat_state"
+        if changed & {"critical", "damage", "hit", "ko", "death", "defeat", "danger"}:
+            return "critical_moment"
+        if changed & {"quest", "goal", "clear", "complete", "objective", "mission"}:
+            return "objective_update"
+        if changed & {"item", "loot", "inventory", "reward", "treasure"}:
+            return "item_update"
+        if changed & {"dialog", "subtitle", "choice"}:
+            return "dialog_event"
+        return None
 
     def _kind(
         self,
@@ -109,6 +138,16 @@ class EventDetector:
         ui_removed: list[str],
         current: SceneState,
     ) -> str:
+        if kind == "combat_state":
+            return f"Combat state changed: {current.summary}"
+        if kind == "critical_moment":
+            return f"Critical moment detected: {current.summary}"
+        if kind == "objective_update":
+            return f"Objective changed: {current.summary}"
+        if kind == "item_update":
+            return f"Item state changed: {current.summary}"
+        if kind == "dialog_event":
+            return f"Dialog state changed: {current.summary}"
         if kind == "ui_change":
             return f"UI changed: +{', '.join(ui_added[:4]) or 'none'} / -{', '.join(ui_removed[:4]) or 'none'}"
         if kind == "label_change":
