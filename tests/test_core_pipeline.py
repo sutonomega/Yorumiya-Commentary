@@ -139,9 +139,30 @@ class CorePipelineTest(unittest.TestCase):
         scenes = [analyzer.analyze(frame) for frame in frames]
         events = [detector.detect(scene) for scene in scenes]
 
-        self.assertEqual([scene.summary for scene in scenes], ["field view", "battle starts with enemy", "critical hit lands", "back to field", "dialog choice appears"])
-        self.assertEqual([scene.labels for scene in scenes], [("field",), ("field", "battle", "enemy"), ("battle", "enemy", "critical", "hit"), ("field",), ("field", "dialog", "choice")])
-        self.assertEqual([event.kind if event else None for event in events], ["scene_initial", "combat_state", "critical_moment", "combat_state", "dialog_event"])
+        self.assertEqual(
+            [scene.summary for scene in scenes],
+            ["field view", "battle starts", "enemy appears", "boss appears", "critical hit lands", "back to field", "dialog choice appears"],
+        )
+        self.assertEqual(
+            [scene.labels for scene in scenes],
+            [
+                ("field",),
+                ("field", "battle"),
+                ("field", "battle", "enemy"),
+                ("battle", "enemy", "boss"),
+                ("battle", "enemy", "boss", "critical", "hit"),
+                ("field",),
+                ("field", "dialog", "choice"),
+            ],
+        )
+        self.assertEqual(
+            [event.kind if event else None for event in events],
+            ["scene_initial", "combat_state", "combat_state", "combat_state", "critical_moment", "combat_state", "dialog_event"],
+        )
+        self.assertEqual(
+            [event.metadata.get("event_phase") if event else None for event in events],
+            [None, "combat_start", "enemy_appeared", "boss_appeared", None, "combat_end", None],
+        )
         self.assertTrue(all(event and event.metadata["source"] == "scene" for event in events))
 
     def test_event_detector_classifies_combat_state_before_generic_label_change(self):
