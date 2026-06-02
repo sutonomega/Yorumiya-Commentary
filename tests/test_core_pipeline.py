@@ -131,17 +131,8 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(second_event.metadata["ui_added"], ["menu", "score"])
 
     def test_mock_video_frames_detect_scene_events_over_time(self):
-        mock_frames = [
-            {"timestamp": 0, "data": {"summary": "field view", "labels": ["field"], "confidence": 0.5}},
-            {"timestamp": 1, "data": {"summary": "battle starts with enemy", "labels": ["field", "battle", "enemy"], "confidence": 0.85}},
-            {"timestamp": 2, "data": {"summary": "critical hit lands", "labels": ["battle", "enemy", "critical", "hit"], "confidence": 0.9}},
-            {"timestamp": 3, "data": {"summary": "back to field", "labels": ["field"], "confidence": 0.75}},
-            {"timestamp": 4, "data": {"summary": "dialog choice appears", "labels": ["field", "dialog", "choice"], "ui_elements": ["dialog"], "confidence": 0.8}},
-        ]
-        with TemporaryDirectory() as temp_dir:
-            path = Path(temp_dir) / "mock_video.jsonl"
-            path.write_text("\n".join(json.dumps(frame) for frame in mock_frames), encoding="utf-8")
-            frames = list(FrameFileInput(path, fps=1).iter_frames())
+        path = Path(__file__).parent / "fixtures" / "mock_videos" / "event_flow.jsonl"
+        frames = list(FrameFileInput(path, fps=1).iter_frames())
 
         analyzer = SceneAnalyzer()
         detector = EventDetector()
