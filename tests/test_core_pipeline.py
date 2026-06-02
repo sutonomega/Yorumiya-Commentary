@@ -147,12 +147,13 @@ class CorePipelineTest(unittest.TestCase):
     def test_event_detector_classifies_combat_state_before_generic_label_change(self):
         detector = EventDetector()
         detector.detect(SceneAnalyzer().analyze(next(VideoInput(["field view"], fps=1).iter_frames())))
-        frame = next(VideoInput(["battle enemy appears"], fps=1).iter_frames())
+        frame = next(VideoInput(["battle starts"], fps=1).iter_frames())
 
         event = detector.detect(SceneAnalyzer().analyze(frame))
 
         self.assertEqual(event.kind, "combat_state")
         self.assertEqual(event.metadata["semantic_event"], "combat_state")
+        self.assertEqual(event.metadata["event_phase"], "combat_start")
         self.assertTrue(event.should_speak)
 
     def test_event_detector_classifies_combat_state_when_battle_labels_disappear(self):
@@ -165,7 +166,28 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(event.kind, "combat_state")
         self.assertEqual(event.metadata["removed"], ["battle", "enemy"])
         self.assertEqual(event.metadata["semantic_event"], "combat_state")
+        self.assertEqual(event.metadata["event_phase"], "combat_end")
         self.assertTrue(event.should_speak)
+
+    def test_event_detector_sets_enemy_appeared_phase(self):
+        detector = EventDetector()
+        detector.detect(SceneAnalyzer().analyze(next(VideoInput(["battle"], fps=1).iter_frames())))
+        frame = next(VideoInput(["battle enemy"], fps=1).iter_frames())
+
+        event = detector.detect(SceneAnalyzer().analyze(frame))
+
+        self.assertEqual(event.kind, "combat_state")
+        self.assertEqual(event.metadata["event_phase"], "enemy_appeared")
+
+    def test_event_detector_sets_boss_appeared_phase(self):
+        detector = EventDetector()
+        detector.detect(SceneAnalyzer().analyze(next(VideoInput(["battle enemy"], fps=1).iter_frames())))
+        frame = next(VideoInput(["battle enemy boss"], fps=1).iter_frames())
+
+        event = detector.detect(SceneAnalyzer().analyze(frame))
+
+        self.assertEqual(event.kind, "combat_state")
+        self.assertEqual(event.metadata["event_phase"], "boss_appeared")
 
     def test_event_detector_classifies_critical_moment(self):
         detector = EventDetector()
