@@ -141,6 +141,18 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(event.metadata["semantic_event"], "combat_state")
         self.assertTrue(event.should_speak)
 
+    def test_event_detector_classifies_combat_state_when_battle_labels_disappear(self):
+        detector = EventDetector()
+        detector.detect(SceneAnalyzer().analyze(next(VideoInput(["battle enemy"], fps=1).iter_frames())))
+        frame = next(VideoInput(["field"], fps=1).iter_frames())
+
+        event = detector.detect(SceneAnalyzer().analyze(frame))
+
+        self.assertEqual(event.kind, "combat_state")
+        self.assertEqual(event.metadata["removed"], ["battle", "enemy"])
+        self.assertEqual(event.metadata["semantic_event"], "combat_state")
+        self.assertTrue(event.should_speak)
+
     def test_event_detector_classifies_critical_moment(self):
         detector = EventDetector()
         detector.detect(SceneAnalyzer().analyze(next(VideoInput(["battle enemy"], fps=1).iter_frames())))

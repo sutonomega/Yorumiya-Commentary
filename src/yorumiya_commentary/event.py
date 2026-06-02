@@ -48,7 +48,7 @@ class EventDetector:
         ui_removed = sorted(previous_ui - current_ui)
         summary_changed = current.summary != self.previous.summary
         confidence_delta = max(0.0, current.confidence - self.previous.confidence)
-        semantic_event = self._semantic_event(added, removed, ui_added, ui_removed, current)
+        semantic_event = self._semantic_event(added, removed, ui_added, ui_removed, previous_labels, current_labels)
         salience = self._salience(added, removed, ui_added, ui_removed, summary_changed, confidence_delta, semantic_event is not None)
         kind = semantic_event or self._kind(added, removed, ui_added, ui_removed, summary_changed)
         self.previous = current
@@ -97,11 +97,12 @@ class EventDetector:
         removed: list[str],
         ui_added: list[str],
         ui_removed: list[str],
-        current: SceneState,
+        previous_labels: set[str],
+        current_labels: set[str],
     ) -> str | None:
         changed = set(added) | set(removed) | set(ui_added) | set(ui_removed)
-        current_labels = set(current.labels)
-        if changed & {"boss", "enemy", "battle", "combat"} and current_labels & {"boss", "enemy", "battle", "combat"}:
+        combat_labels = {"boss", "enemy", "battle", "combat"}
+        if changed & combat_labels and (previous_labels | current_labels) & combat_labels:
             return "combat_state"
         if changed & {"critical", "damage", "hit", "ko", "death", "defeat", "danger"}:
             return "critical_moment"
