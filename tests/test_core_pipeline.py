@@ -130,6 +130,54 @@ class CorePipelineTest(unittest.TestCase):
         self.assertTrue(second_event.should_speak)
         self.assertEqual(second_event.metadata["ui_added"], ["menu", "score"])
 
+    def test_mock_video_frames_detect_scene_events_over_time(self):
+        path = Path(__file__).parent / "fixtures" / "mock_videos" / "event_flow.jsonl"
+        frames = list(FrameFileInput(path, fps=1).iter_frames())
+
+        analyzer = SceneAnalyzer()
+        detector = EventDetector()
+        scenes = [analyzer.analyze(frame) for frame in frames]
+        events = [detector.detect(scene) for scene in scenes]
+
+        self.assertEqual([scene.summary for scene in scenes], ["field view", "battle starts with enemy", "critical hit lands", "back to field", "dialog choice appears"])
+        self.assertEqual([scene.labels for scene in scenes], [("field",), ("field", "battle", "enemy"), ("battle", "enemy", "critical", "hit"), ("field",), ("field", "dialog", "choice")])
+        self.assertEqual([event.kind if event else None for event in events], ["scene_initial", "combat_state", "critical_moment", "combat_state", "dialog_event"])
+        self.assertTrue(all(event and event.metadata["source"] == "scene" for event in events))
+
+    def test_event_detector_classifies_combat_state_before_generic_label_change(self):
+        detector = EventDetector()
+        detector.detect(SceneAnalyzer().analyze(next(VideoInput(["field view"], fps=1).iter_frames())))
+        frame = next(VideoInput(["battle enemy appears"], fps=1).iter_frames())
+
+        event = detector.detect(SceneAnalyzer().analyze(frame))
+
+        self.assertEqual(event.kind, "combat_state")
+        self.assertEqual(event.metadata["semantic_event"], "combat_state")
+        self.assertTrue(event.should_speak)
+
+    def test_event_detector_classifies_combat_state_when_battle_labels_disappear(self):
+        detector = EventDetector()
+        detector.detect(SceneAnalyzer().analyze(next(VideoInput(["battle enemy"], fps=1).iter_frames())))
+        frame = next(VideoInput(["field"], fps=1).iter_frames())
+
+        event = detector.detect(SceneAnalyzer().analyze(frame))
+
+        self.assertEqual(event.kind, "combat_state")
+        self.assertEqual(event.metadata["removed"], ["battle", "enemy"])
+        self.assertEqual(event.metadata["semantic_event"], "combat_state")
+        self.assertTrue(event.should_speak)
+
+    def test_event_detector_classifies_critical_moment(self):
+        detector = EventDetector()
+        detector.detect(SceneAnalyzer().analyze(next(VideoInput(["battle enemy"], fps=1).iter_frames())))
+        frame = next(VideoInput(["battle enemy critical hit"], fps=1).iter_frames())
+
+        event = detector.detect(SceneAnalyzer().analyze(frame))
+
+        self.assertEqual(event.kind, "critical_moment")
+        self.assertEqual(event.metadata["semantic_event"], "critical_moment")
+        self.assertTrue(event.should_speak)
+
     def test_frame_file_to_comment_generation_flow(self):
         with TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "frames.jsonl"
