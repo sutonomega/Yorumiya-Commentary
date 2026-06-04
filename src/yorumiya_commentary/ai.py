@@ -16,6 +16,14 @@ SUPPRESSION_STALE_CONTEXT = "stale_context"
 SUPPRESSION_NO_SIGNAL = "no_signal"
 
 
+EVENT_PHASE_COMMENTS = {
+    "combat_start": "戦闘が始まったね",
+    "enemy_appeared": "敵が出てきたね",
+    "boss_appeared": "ボスだ",
+    "combat_end": "ひと段落ついたね",
+}
+
+
 EVENT_KIND_COMMENTS = {
     "critical_moment": "今のは大きいね",
     "objective_update": "目標が更新されたね",
@@ -213,12 +221,7 @@ class CommentGenerator:
     def _event_phase_comment(self, event_phase: object) -> str | None:
         if not isinstance(event_phase, str):
             return None
-        return {
-            "combat_start": "戦闘が始まったね",
-            "enemy_appeared": "敵が出てきたね",
-            "boss_appeared": "ボスだ",
-            "combat_end": "ひと段落ついたね",
-        }.get(event_phase)
+        return EVENT_PHASE_COMMENTS.get(event_phase)
 
     def _trim(self, text: str) -> str:
         return text if len(text) <= self.policy.max_length else text[: self.policy.max_length - 1] + "…"
