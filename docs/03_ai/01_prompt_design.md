@@ -17,6 +17,21 @@ MVP の `CommentGenerator` は prompt 実行そのものより、発話判断の
 - `stale_after_seconds`: 古くなった context を喋らないための期限。
 - `max_length`: 1回の comment の最大長。
 
+## Event Phase Comment
+
+`event_phase` がある event は、汎用 event kind より先に phase 専用の短い comment を選ぶ。
+
+MVP では `combat_state` の phase を対象にする。
+
+| event_phase | comment 方針 |
+| --- | --- |
+| `combat_start` | 戦闘が始まったことを短く拾う |
+| `enemy_appeared` | 敵が出てきたことを拾う |
+| `boss_appeared` | ボス登場として強めに拾う |
+| `combat_end` | 戦闘が落ち着いたことを拾う |
+
+phase comment は説明しすぎず、1文で自然に反応する。該当 phase がない場合は従来の event kind / emotion ベースの comment に戻す。
+
 ## Suppression Reason
 
 Quiet AI では、生成した comment だけでなく「なぜ黙ったか」を追える必要がある。
