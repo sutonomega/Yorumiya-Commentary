@@ -37,7 +37,11 @@ phase comment は説明しすぎず、1文で自然に反応する。該当 phas
 
 phase を持たない semantic event は、event kind ごとに短い comment を選ぶ。
 
-MVP では `critical_moment` を対象にする。`critical_moment` はダメージ、危機、決着など複数の意味を含むため、細かく断定せず「今のは大きいね」と汎用的に反応する。
+MVP では `critical_moment` と `objective_update` を対象にする。
+
+`critical_moment` はダメージ、危機、決着など複数の意味を含むため、細かく断定せず「今のは大きいね」と汎用的に反応する。
+
+`objective_update` は目標更新、クリア、ミッション進行などを含むため、「目標が更新されたね」と短く拾う。
 
 ## Suppression Reason
 

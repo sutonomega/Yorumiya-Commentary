@@ -195,6 +195,8 @@ class CommentGenerator:
             return f"画面に{target}が増えたね" if target else "画面の要素が変わったね"
         if context.event.kind == "critical_moment":
             return "今のは大きいね"
+        if context.event.kind == "objective_update":
+            return "目標が更新されたね"
 
         if emotion == "excited":
             return f"お、今かなり動いたね。{context.event.description}"

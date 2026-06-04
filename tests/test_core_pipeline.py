@@ -307,6 +307,22 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(decision.reason, "critical_moment")
         self.assertEqual(decision.comment.text, "今のは大きいね")
 
+    def test_comment_generator_uses_objective_update_comment(self):
+        generator = CommentGenerator()
+        event = CommentaryEvent(
+            timestamp=1.0,
+            kind="objective_update",
+            description="Objective changed",
+            salience=0.9,
+            should_speak=True,
+        )
+
+        decision = generator.evaluate(CommentaryContext(timestamp=1.0, event=event))
+
+        self.assertFalse(decision.suppressed)
+        self.assertEqual(decision.reason, "objective_update")
+        self.assertEqual(decision.comment.text, "目標が更新されたね")
+
     def test_comment_generator_reports_suppression_reasons(self):
         generator = CommentGenerator(policy=CommentPolicy(min_salience=0.5, stale_after_seconds=1.0))
         low_event = CommentaryEvent(timestamp=10.0, kind="label_change", description="small change", salience=0.2, should_speak=False)
