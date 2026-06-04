@@ -267,6 +267,27 @@ class CorePipelineTest(unittest.TestCase):
                 self.assertEqual(decision.reason, "combat_state")
                 self.assertEqual(decision.comment.text, expected_text)
 
+    def test_comment_generator_suppresses_repeated_phase_comment(self):
+        generator = CommentGenerator()
+        event = CommentaryEvent(
+            timestamp=1.0,
+            kind="combat_state",
+            description="Combat state changed",
+            salience=0.9,
+            should_speak=True,
+            metadata={"event_phase": "combat_start"},
+        )
+        context = CommentaryContext(timestamp=1.0, event=event)
+
+        first = generator.evaluate(context)
+        second = generator.evaluate(context)
+
+        self.assertFalse(first.suppressed)
+        self.assertEqual(first.comment.text, "戦闘が始まったね")
+        self.assertTrue(second.suppressed)
+        self.assertEqual(second.reason, "repeated_comment")
+        self.assertIsNone(second.comment)
+
     def test_comment_generator_falls_back_when_combat_event_phase_is_unknown(self):
         cases = (
             {"event_phase": "unknown_phase"},
