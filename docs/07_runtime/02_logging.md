@@ -11,6 +11,7 @@
 - `timestamp`
 - `event_kind`
 - `event_source`
+- `scene_event_phase`
 - `event_salience`
 - `decision_reason`
 - `decision_source`
@@ -21,6 +22,8 @@
 - `queue_speech_count`
 - `audio_trace`
 - `event_selection`
+
+`scene_event_phase` は scene event metadata の `event_phase` を記録する。`decision_reason=combat_state` と `scene_event_phase=combat_start` のように、大分類と小分類を分けて残すことで、phase comment が選ばれた理由を追いやすくする。
 
 ## Event Selection Trace
 

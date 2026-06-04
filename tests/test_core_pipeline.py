@@ -569,6 +569,19 @@ class CorePipelineTest(unittest.TestCase):
         self.assertTrue(trace.has_speech_audio)
         self.assertTrue(trace.as_dict()["has_speech_audio"])
 
+    def test_pipeline_trace_records_scene_event_phase(self):
+        video = VideoInput(["field view", "battle starts"], fps=1)
+        pipeline = RealtimePipeline()
+        frames = list(video.iter_frames())
+
+        pipeline.process_frame_step(frames[0])
+        trace = pipeline.process_frame_step(frames[1]).to_trace()
+
+        self.assertEqual(trace.event_kind, "combat_state")
+        self.assertEqual(trace.decision_reason, "combat_state")
+        self.assertEqual(trace.scene_event_phase, "combat_start")
+        self.assertEqual(trace.as_dict()["scene_event_phase"], "combat_start")
+
     def test_trace_step_records_suppressed_decision_and_queue_count(self):
         video = VideoInput(["same scene", "same scene"], fps=1)
         pipeline = RealtimePipeline()

@@ -203,6 +203,7 @@ class PipelineTrace:
     timestamp: float
     event_kind: str | None
     event_source: str | None
+    scene_event_phase: str | None
     event_salience: float | None
     decision_reason: str
     decision_source: str
@@ -221,6 +222,7 @@ class PipelineTrace:
             timestamp=result.context.timestamp,
             event_kind=event.kind if event else None,
             event_source=event.metadata.get("source", "scene") if event else None,
+            scene_event_phase=_scene_event_phase(event),
             event_salience=event.salience if event else None,
             decision_reason=result.comment_decision.reason,
             decision_source=_decision_source(result.comment_decision.reason),
@@ -238,6 +240,7 @@ class PipelineTrace:
             "timestamp": self.timestamp,
             "event_kind": self.event_kind,
             "event_source": self.event_source,
+            "scene_event_phase": self.scene_event_phase,
             "event_salience": self.event_salience,
             "decision_reason": self.decision_reason,
             "decision_source": self.decision_source,
@@ -697,6 +700,13 @@ class RuntimeService:
             "traces": len(self.recorder.traces),
             "file_recorder": str(self.file_recorder.path) if self.file_recorder else None,
         }
+
+
+def _scene_event_phase(event: CommentaryEvent | None) -> str | None:
+    if not event or event.metadata.get("source", "scene") != "scene":
+        return None
+    phase = event.metadata.get("event_phase")
+    return phase if isinstance(phase, str) else None
 
 
 def _decision_source(reason: str) -> str:
