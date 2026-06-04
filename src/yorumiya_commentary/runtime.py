@@ -23,6 +23,7 @@ from .audio import AudioAnalyzer, AudioEventDetector, TranscriptEventDetector, V
 from .event import EventDetector
 from .models import AudioChunk, CommentaryContext, CommentaryEvent, Frame, SpeechAudio, SpeechItem
 from .scene import SceneAnalyzer
+from .video import OpenCVVideoInput
 from .voice import AudioPlayer, PlaybackResult, SpeechStyle, SpeechSynthesizer, comment_to_speech_item
 
 
@@ -703,6 +704,27 @@ class RuntimeService:
             "traces": len(self.recorder.traces),
             "file_recorder": str(self.file_recorder.path) if self.file_recorder else None,
         }
+
+
+def run_mp4_commentary(
+    path: str | Path,
+    *,
+    pipeline: RealtimePipeline | None = None,
+    sample_interval_seconds: float = 2.0,
+    start_timestamp: float = 0.0,
+    end_timestamp: float | None = None,
+    max_frames: int | None = None,
+    synthesize: bool = False,
+) -> list[PipelineStepResult]:
+    video = OpenCVVideoInput(
+        path,
+        sample_interval_seconds=sample_interval_seconds,
+        start_timestamp=start_timestamp,
+        end_timestamp=end_timestamp,
+        max_frames=max_frames,
+    )
+    resolved_pipeline = pipeline or RealtimePipeline()
+    return [resolved_pipeline.process_frame_step(frame, synthesize=synthesize) for frame in video.iter_frames()]
 
 
 def _scene_event_phase(event: CommentaryEvent | None) -> str | None:

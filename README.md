@@ -206,6 +206,27 @@ scheduler や logging などの実行基盤。
 
 ---
 
+# MP4 Commentary Smoke
+
+OpenCV が入っている環境では、実際の mp4 を読み込んで既存 pipeline から comment まで流せる。
+
+```bash
+python3 -m pip install -e '.[video]'
+```
+
+```python
+from yorumiya_commentary import run_mp4_commentary
+
+results = run_mp4_commentary("sample.mp4", sample_interval_seconds=2.0, max_frames=5)
+for result in results:
+    if result.comment_decision.comment:
+        print(result.comment_decision.comment.text)
+```
+
+内蔵の mp4 adapter は軽量な visual metadata だけを作る。ゲーム固有の理解を行う場合は、`SceneAnalyzer(vision_adapter=...)` に vision model / OCR / object detector を接続する。
+
+---
+
 # Notes
 
 このプロジェクトでは：

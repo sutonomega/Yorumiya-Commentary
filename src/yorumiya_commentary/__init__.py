@@ -32,9 +32,10 @@ from .runtime import (
     SpeechStepResult,
     SpeechTrace,
     TaskQueue,
+    run_mp4_commentary,
 )
 from .scene import SceneAnalysisConfig, SceneAnalyzer
-from .video import FrameFileInput, FrameSampler, FrameSamplingPolicy, VideoInput
+from .video import FrameFileInput, FrameSampler, FrameSamplingPolicy, OpenCVVideoInput, VideoInput
 from .voice import (
     AudioPlayer,
     FakeAudioPlayer,
@@ -66,6 +67,7 @@ __all__ = [
     "FrameFileInput",
     "FrameSampler",
     "FrameSamplingPolicy",
+    "OpenCVVideoInput",
     "FakeAudioPlayer",
     "FakeVoiceSynthesizer",
     "MemoryStore",
@@ -99,4 +101,5 @@ __all__ = [
     "VoicevoxSynthesizer",
     "WhisperTranscriber",
     "comment_to_speech_item",
+    "run_mp4_commentary",
 ]
