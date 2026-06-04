@@ -197,6 +197,8 @@ class CommentGenerator:
             return "今のは大きいね"
         if context.event.kind == "objective_update":
             return "目標が更新されたね"
+        if context.event.kind == "item_update":
+            return "何か手に入ったね"
 
         if emotion == "excited":
             return f"お、今かなり動いたね。{context.event.description}"
