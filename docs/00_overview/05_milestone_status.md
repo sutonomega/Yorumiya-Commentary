@@ -4,6 +4,8 @@ This page keeps the current roadmap status separate from implementation details.
 
 ## Current Status
 
+Phase 1 MVP is complete. Scene events can be detected, mapped to short comments, and traced with event kind / phase / selection reason.
+
 | Milestone | Status | Notes |
 | --- | --- | --- |
 | M2 MVP Commentary Pipeline | Complete | Frame -> SceneState -> CommentaryEvent -> Comment -> SpeechItem -> SpeechAudio is covered by tests. |
