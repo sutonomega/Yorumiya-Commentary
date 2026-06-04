@@ -16,6 +16,13 @@ SUPPRESSION_STALE_CONTEXT = "stale_context"
 SUPPRESSION_NO_SIGNAL = "no_signal"
 
 
+EVENT_KIND_COMMENTS = {
+    "critical_moment": "今のは大きいね",
+    "objective_update": "目標が更新されたね",
+    "item_update": "何か手に入ったね",
+}
+
+
 @dataclass(frozen=True)
 class CommentPolicy:
     max_length: int = 42
@@ -193,12 +200,9 @@ class CommentGenerator:
             added = context.event.metadata.get("added", [])
             target = ", ".join(added[:2]) if isinstance(added, list) and added else ""
             return f"画面に{target}が増えたね" if target else "画面の要素が変わったね"
-        if context.event.kind == "critical_moment":
-            return "今のは大きいね"
-        if context.event.kind == "objective_update":
-            return "目標が更新されたね"
-        if context.event.kind == "item_update":
-            return "何か手に入ったね"
+        event_kind_comment = EVENT_KIND_COMMENTS.get(context.event.kind)
+        if event_kind_comment:
+            return event_kind_comment
 
         if emotion == "excited":
             return f"お、今かなり動いたね。{context.event.description}"
