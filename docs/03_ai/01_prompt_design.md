@@ -33,6 +33,12 @@ MVP では `combat_state` の phase を対象にする。
 
 phase comment は説明しすぎず、1文で自然に反応する。該当 phase がない場合は従来の event kind / emotion / description ベースの comment に戻す。
 
+## Event Kind Comment
+
+phase を持たない semantic event は、event kind ごとに短い comment を選ぶ。
+
+MVP では `critical_moment` を対象にする。`critical_moment` はダメージ、危機、決着など複数の意味を含むため、細かく断定せず「今のは大きいね」と汎用的に反応する。
+
 ## Suppression Reason
 
 Quiet AI では、生成した comment だけでなく「なぜ黙ったか」を追える必要がある。
