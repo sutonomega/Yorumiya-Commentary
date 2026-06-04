@@ -1,5 +1,7 @@
 {"timestamp": 0, "data": {"summary": "field view", "labels": ["field"], "confidence": 0.5}}
-{"timestamp": 1, "data": {"summary": "battle starts with enemy", "labels": ["field", "battle", "enemy"], "confidence": 0.85}}
-{"timestamp": 2, "data": {"summary": "critical hit lands", "labels": ["battle", "enemy", "critical", "hit"], "confidence": 0.9}}
-{"timestamp": 3, "data": {"summary": "back to field", "labels": ["field"], "confidence": 0.75}}
-{"timestamp": 4, "data": {"summary": "dialog choice appears", "labels": ["field", "dialog", "choice"], "ui_elements": ["dialog"], "confidence": 0.8}}
+{"timestamp": 1, "data": {"summary": "battle starts", "labels": ["field", "battle"], "confidence": 0.8}}
+{"timestamp": 2, "data": {"summary": "enemy appears", "labels": ["field", "battle", "enemy"], "confidence": 0.85}}
+{"timestamp": 3, "data": {"summary": "boss appears", "labels": ["battle", "enemy", "boss"], "confidence": 0.9}}
+{"timestamp": 4, "data": {"summary": "critical hit lands", "labels": ["battle", "enemy", "boss", "critical", "hit"], "confidence": 0.9}}
+{"timestamp": 5, "data": {"summary": "back to field", "labels": ["field"], "confidence": 0.75}}
+{"timestamp": 6, "data": {"summary": "dialog choice appears", "labels": ["field", "dialog", "choice"], "ui_elements": ["dialog"], "confidence": 0.8}}

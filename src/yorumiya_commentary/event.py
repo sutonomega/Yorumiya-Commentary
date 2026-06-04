@@ -49,6 +49,7 @@ class EventDetector:
         summary_changed = current.summary != self.previous.summary
         confidence_delta = max(0.0, current.confidence - self.previous.confidence)
         semantic_event = self._semantic_event(added, removed, ui_added, ui_removed, previous_labels, current_labels)
+        event_phase = self._event_phase(semantic_event, added, previous_labels, current_labels)
         salience = self._salience(added, removed, ui_added, ui_removed, summary_changed, confidence_delta, semantic_event is not None)
         kind = semantic_event or self._kind(added, removed, ui_added, ui_removed, summary_changed)
         self.previous = current
@@ -71,6 +72,7 @@ class EventDetector:
                 "summary_changed": summary_changed,
                 "confidence_delta": confidence_delta,
                 "semantic_event": semantic_event,
+                "event_phase": event_phase,
             },
         )
 
@@ -112,6 +114,31 @@ class EventDetector:
             return "item_update"
         if changed & {"dialog", "subtitle", "choice"}:
             return "dialog_event"
+        return None
+
+    def _event_phase(
+        self,
+        semantic_event: str | None,
+        added: list[str],
+        previous_labels: set[str],
+        current_labels: set[str],
+    ) -> str | None:
+        if semantic_event != "combat_state":
+            return None
+
+        added_labels = set(added)
+        combat_labels = {"boss", "enemy", "battle", "combat"}
+        previous_has_combat = bool(previous_labels & combat_labels)
+        current_has_combat = bool(current_labels & combat_labels)
+
+        if "boss" in added_labels:
+            return "boss_appeared"
+        if "enemy" in added_labels:
+            return "enemy_appeared"
+        if not previous_has_combat and current_has_combat:
+            return "combat_start"
+        if previous_has_combat and not current_has_combat:
+            return "combat_end"
         return None
 
     def _kind(
