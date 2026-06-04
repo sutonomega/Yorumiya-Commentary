@@ -179,6 +179,10 @@ class CommentGenerator:
 
     def _event_comment(self, context: CommentaryContext) -> str:
         assert context.event is not None
+        phase_comment = self._event_phase_comment(context.event.metadata.get("event_phase"))
+        if phase_comment:
+            return phase_comment
+
         emotion = context.emotion.emotion if context.emotion else "calm"
         if context.event.kind == "ui_change":
             ui_added = context.event.metadata.get("ui_added", [])
@@ -195,6 +199,16 @@ class CommentGenerator:
         if emotion == "interested":
             return f"流れが少し変わったね。{context.event.description}"
         return f"ここ、変化があったね。{context.event.description}"
+
+    def _event_phase_comment(self, event_phase: object) -> str | None:
+        if not isinstance(event_phase, str):
+            return None
+        return {
+            "combat_start": "戦闘が始まったね",
+            "enemy_appeared": "敵が出てきたね",
+            "boss_appeared": "ボスだ",
+            "combat_end": "ひと段落ついたね",
+        }.get(event_phase)
 
     def _trim(self, text: str) -> str:
         return text if len(text) <= self.policy.max_length else text[: self.policy.max_length - 1] + "…"

@@ -241,6 +241,56 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(decision.reason, "ui_change")
         self.assertIn("UI", decision.comment.text)
 
+    def test_comment_generator_uses_combat_event_phase_comments(self):
+        cases = {
+            "combat_start": "戦闘が始まったね",
+            "enemy_appeared": "敵が出てきたね",
+            "boss_appeared": "ボスだ",
+            "combat_end": "ひと段落ついたね",
+        }
+
+        for phase, expected_text in cases.items():
+            with self.subTest(phase=phase):
+                generator = CommentGenerator()
+                event = CommentaryEvent(
+                    timestamp=1.0,
+                    kind="combat_state",
+                    description="Combat state changed",
+                    salience=0.9,
+                    should_speak=True,
+                    metadata={"event_phase": phase},
+                )
+
+                decision = generator.evaluate(CommentaryContext(timestamp=1.0, event=event))
+
+                self.assertFalse(decision.suppressed)
+                self.assertEqual(decision.reason, "combat_state")
+                self.assertEqual(decision.comment.text, expected_text)
+
+    def test_comment_generator_falls_back_when_combat_event_phase_is_unknown(self):
+        cases = (
+            {"event_phase": "unknown_phase"},
+            {},
+        )
+
+        for metadata in cases:
+            with self.subTest(metadata=metadata):
+                generator = CommentGenerator()
+                event = CommentaryEvent(
+                    timestamp=1.0,
+                    kind="combat_state",
+                    description="Combat state changed",
+                    salience=0.9,
+                    should_speak=True,
+                    metadata=metadata,
+                )
+
+                decision = generator.evaluate(CommentaryContext(timestamp=1.0, event=event))
+
+                self.assertFalse(decision.suppressed)
+                self.assertEqual(decision.reason, "combat_state")
+                self.assertEqual(decision.comment.text, "ここ、変化があったね。Combat state changed")
+
     def test_comment_generator_reports_suppression_reasons(self):
         generator = CommentGenerator(policy=CommentPolicy(min_salience=0.5, stale_after_seconds=1.0))
         low_event = CommentaryEvent(timestamp=10.0, kind="label_change", description="small change", salience=0.2, should_speak=False)
