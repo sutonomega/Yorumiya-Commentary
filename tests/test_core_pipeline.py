@@ -634,6 +634,20 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(trace.scene_event_phase, "combat_start")
         self.assertEqual(trace.as_dict()["scene_event_phase"], "combat_start")
 
+    def test_pipeline_trace_records_dialog_event_phase(self):
+        video = VideoInput(["field dialog", "field dialog choice"], fps=1)
+        pipeline = RealtimePipeline()
+        frames = list(video.iter_frames())
+
+        pipeline.process_frame_step(frames[0])
+        trace = pipeline.process_frame_step(frames[1]).to_trace()
+
+        self.assertEqual(trace.event_kind, "dialog_event")
+        self.assertEqual(trace.scene_event_phase, "dialog_choice")
+        self.assertEqual(trace.as_dict()["scene_event_phase"], "dialog_choice")
+        self.assertEqual(trace.event_selection.scene_event_phase, "dialog_choice")
+        self.assertEqual(trace.event_selection.as_dict()["scene_event_phase"], "dialog_choice")
+
     def test_trace_step_records_suppressed_decision_and_queue_count(self):
         video = VideoInput(["same scene", "same scene"], fps=1)
         pipeline = RealtimePipeline()
