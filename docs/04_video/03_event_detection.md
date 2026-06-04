@@ -55,7 +55,7 @@ MVP では `dialog_event` は trace と context には残すが、専用 comment
 
 `kind` は event の大分類を表す。`event_phase` は、その kind の中で「何を喋る価値があるか」を判断するための小分類として metadata に入れる。
 
-MVP では `combat_state` だけ `event_phase` を持つ。
+MVP では `combat_state` と `dialog_event` が `event_phase` を持つ。
 
 | kind | event_phase | 判定 |
 | --- | --- | --- |
@@ -63,8 +63,12 @@ MVP では `combat_state` だけ `event_phase` を持つ。
 | `combat_state` | `combat_end` | previous に combat label があり、current に combat label がない |
 | `combat_state` | `boss_appeared` | `boss` が added にある |
 | `combat_state` | `enemy_appeared` | `enemy` が added にある |
+| `dialog_event` | `dialog_start` | previous に dialog label がなく、current に `dialog`、`subtitle`、`choice` のいずれかがある |
+| `dialog_event` | `dialog_choice` | `choice` が added にある |
+| `dialog_event` | `dialog_end` | previous に dialog label があり、current に dialog label がない |
 
 phase の優先順位は `boss_appeared`、`enemy_appeared`、`combat_start`、`combat_end` とする。ボス出現や敵出現は発話価値が高いため、戦闘開始より具体的な phase を優先する。
+`dialog_event` では `dialog_choice`、`dialog_start`、`dialog_end` の順に具体的な phase を優先する。
 
 ## Salience
 
@@ -94,7 +98,7 @@ scene event metadata には次を入れる。
 
 `semantic_event` は semantic rule に当たった時だけ event kind と同じ値になる。汎用差分の場合は `None`。
 
-`event_phase` は該当する semantic event に小分類がある場合だけ入れる。現時点では `combat_state` のみが対象。
+`event_phase` は該当する semantic event に小分類がある場合だけ入れる。現時点では `combat_state` と `dialog_event` が対象。
 
 ## Out Of Scope
 
