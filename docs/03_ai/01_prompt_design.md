@@ -32,6 +32,7 @@ MVP では `combat_state` の phase を対象にする。
 | `combat_end` | 戦闘が落ち着いたことを拾う |
 
 phase comment は説明しすぎず、1文で自然に反応する。該当 phase がない場合は従来の event kind / emotion / description ベースの comment に戻す。
+同じ phase comment が直近に出ている場合は、通常の repeated comment suppression で抑制する。
 
 ## Event Kind Comment
 
