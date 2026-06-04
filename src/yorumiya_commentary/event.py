@@ -123,9 +123,18 @@ class EventDetector:
         previous_labels: set[str],
         current_labels: set[str],
     ) -> str | None:
-        if semantic_event != "combat_state":
-            return None
+        if semantic_event == "combat_state":
+            return self._combat_event_phase(added, previous_labels, current_labels)
+        if semantic_event == "dialog_event":
+            return self._dialog_event_phase(added, previous_labels, current_labels)
+        return None
 
+    def _combat_event_phase(
+        self,
+        added: list[str],
+        previous_labels: set[str],
+        current_labels: set[str],
+    ) -> str | None:
         added_labels = set(added)
         combat_labels = {"boss", "enemy", "battle", "combat"}
         previous_has_combat = bool(previous_labels & combat_labels)
@@ -139,6 +148,25 @@ class EventDetector:
             return "combat_start"
         if previous_has_combat and not current_has_combat:
             return "combat_end"
+        return None
+
+    def _dialog_event_phase(
+        self,
+        added: list[str],
+        previous_labels: set[str],
+        current_labels: set[str],
+    ) -> str | None:
+        added_labels = set(added)
+        dialog_labels = {"dialog", "subtitle", "choice"}
+        previous_has_dialog = bool(previous_labels & dialog_labels)
+        current_has_dialog = bool(current_labels & dialog_labels)
+
+        if "choice" in added_labels:
+            return "dialog_choice"
+        if not previous_has_dialog and current_has_dialog:
+            return "dialog_start"
+        if previous_has_dialog and not current_has_dialog:
+            return "dialog_end"
         return None
 
     def _kind(

@@ -161,7 +161,7 @@ class CorePipelineTest(unittest.TestCase):
         )
         self.assertEqual(
             [event.metadata.get("event_phase") if event else None for event in events],
-            [None, "combat_start", "enemy_appeared", "boss_appeared", None, "combat_end", None],
+            [None, "combat_start", "enemy_appeared", "boss_appeared", None, "combat_end", "dialog_choice"],
         )
         self.assertTrue(all(event and event.metadata["source"] == "scene" for event in events))
 
@@ -209,6 +209,37 @@ class CorePipelineTest(unittest.TestCase):
 
         self.assertEqual(event.kind, "combat_state")
         self.assertEqual(event.metadata["event_phase"], "boss_appeared")
+
+    def test_event_detector_sets_dialog_start_phase(self):
+        detector = EventDetector()
+        detector.detect(SceneAnalyzer().analyze(next(VideoInput(["field"], fps=1).iter_frames())))
+        frame = next(VideoInput(["field dialog"], fps=1).iter_frames())
+
+        event = detector.detect(SceneAnalyzer().analyze(frame))
+
+        self.assertEqual(event.kind, "dialog_event")
+        self.assertEqual(event.metadata["semantic_event"], "dialog_event")
+        self.assertEqual(event.metadata["event_phase"], "dialog_start")
+
+    def test_event_detector_sets_dialog_choice_phase(self):
+        detector = EventDetector()
+        detector.detect(SceneAnalyzer().analyze(next(VideoInput(["field dialog"], fps=1).iter_frames())))
+        frame = next(VideoInput(["field dialog choice"], fps=1).iter_frames())
+
+        event = detector.detect(SceneAnalyzer().analyze(frame))
+
+        self.assertEqual(event.kind, "dialog_event")
+        self.assertEqual(event.metadata["event_phase"], "dialog_choice")
+
+    def test_event_detector_sets_dialog_end_phase(self):
+        detector = EventDetector()
+        detector.detect(SceneAnalyzer().analyze(next(VideoInput(["field dialog"], fps=1).iter_frames())))
+        frame = next(VideoInput(["field"], fps=1).iter_frames())
+
+        event = detector.detect(SceneAnalyzer().analyze(frame))
+
+        self.assertEqual(event.kind, "dialog_event")
+        self.assertEqual(event.metadata["event_phase"], "dialog_end")
 
     def test_event_detector_classifies_critical_moment(self):
         detector = EventDetector()
