@@ -21,6 +21,7 @@ MVP の `CommentGenerator` は prompt 実行そのものより、発話判断の
 
 `event_phase` がある event は、汎用 event kind より先に phase 専用の短い comment を選ぶ。
 phase comment は最優先で、event kind、emotion、description より先に返す。
+phase comment は固定 map で管理し、phase が増えても選択ロジックを肥大化させない。
 
 MVP では `combat_state` の phase を対象にする。
 
