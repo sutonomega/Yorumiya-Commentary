@@ -35,6 +35,7 @@
 - `selected_source`
 - `reason`
 - `scene_event_kind`
+- `scene_event_phase`
 - `scene_event_salience`
 - `audio_event_kind`
 - `audio_event_salience`
@@ -42,6 +43,8 @@
 - `transcript_event_salience`
 
 `reason` は `scene_only`、`audio_only`、`transcript_only`、`audio_higher_salience`、`transcript_higher_salience`、`scene_higher_or_equal_salience`、`no_event` のいずれかである。
+
+`scene_event_phase` は scene candidate の phase を記録する。`PipelineTrace.scene_event_phase` が採用後の phase を示すのに対し、`EventSelectionTrace.scene_event_phase` は選択前の scene 候補を確認するために使う。
 
 ## Decision Source
 

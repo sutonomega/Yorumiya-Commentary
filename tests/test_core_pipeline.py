@@ -985,6 +985,20 @@ class CorePipelineTest(unittest.TestCase):
         self.assertGreater(selection.audio_event_salience, selection.scene_event_salience)
         self.assertEqual(selection.as_dict()["selected_kind"], "audio_impact")
 
+    def test_pipeline_trace_records_scene_event_phase_in_event_selection(self):
+        video = VideoInput(["field view", "battle starts"], fps=1)
+        pipeline = RealtimePipeline()
+        frames = list(video.iter_frames())
+
+        pipeline.process_frame_step(frames[0])
+        selection = pipeline.process_frame_step(frames[1]).to_trace().event_selection
+
+        self.assertIsInstance(selection, EventSelectionTrace)
+        self.assertEqual(selection.selected_source, "scene")
+        self.assertEqual(selection.scene_event_kind, "combat_state")
+        self.assertEqual(selection.scene_event_phase, "combat_start")
+        self.assertEqual(selection.as_dict()["scene_event_phase"], "combat_start")
+
     def test_pipeline_trace_records_event_source(self):
         frame = next(VideoInput(["quiet field"], fps=1).iter_frames())
         scene_trace = RealtimePipeline().process_frame_step(frame).to_trace()

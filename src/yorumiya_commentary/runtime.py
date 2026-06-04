@@ -89,6 +89,7 @@ class EventSelectionTrace:
     selected_source: str | None
     reason: str
     scene_event_kind: str | None = None
+    scene_event_phase: str | None = None
     scene_event_salience: float | None = None
     audio_event_kind: str | None = None
     audio_event_salience: float | None = None
@@ -122,6 +123,7 @@ class EventSelectionTrace:
             selected_source=selected_source,
             reason=reason,
             scene_event_kind=scene_event.kind if scene_event else None,
+            scene_event_phase=_scene_event_phase(scene_event),
             scene_event_salience=scene_event.salience if scene_event else None,
             audio_event_kind=audio_event.kind if audio_event else None,
             audio_event_salience=audio_event.salience if audio_event else None,
@@ -135,6 +137,7 @@ class EventSelectionTrace:
             "selected_source": self.selected_source,
             "reason": self.reason,
             "scene_event_kind": self.scene_event_kind,
+            "scene_event_phase": self.scene_event_phase,
             "scene_event_salience": self.scene_event_salience,
             "audio_event_kind": self.audio_event_kind,
             "audio_event_salience": self.audio_event_salience,
