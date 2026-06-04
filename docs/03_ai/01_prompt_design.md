@@ -37,6 +37,7 @@ phase comment は説明しすぎず、1文で自然に反応する。該当 phas
 ## Event Kind Comment
 
 phase を持たない semantic event は、event kind ごとに短い comment を選ぶ。
+event kind comment は固定 map で管理し、対象 kind が増えても選択ロジックを肥大化させない。
 
 MVP では `critical_moment`、`objective_update`、`item_update` を対象にする。
 
