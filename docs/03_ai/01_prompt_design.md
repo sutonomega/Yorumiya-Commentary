@@ -20,6 +20,7 @@ MVP の `CommentGenerator` は prompt 実行そのものより、発話判断の
 ## Event Phase Comment
 
 `event_phase` がある event は、汎用 event kind より先に phase 専用の短い comment を選ぶ。
+phase comment は最優先で、event kind、emotion、description より先に返す。
 
 MVP では `combat_state` の phase を対象にする。
 
@@ -30,7 +31,7 @@ MVP では `combat_state` の phase を対象にする。
 | `boss_appeared` | ボス登場として強めに拾う |
 | `combat_end` | 戦闘が落ち着いたことを拾う |
 
-phase comment は説明しすぎず、1文で自然に反応する。該当 phase がない場合は従来の event kind / emotion ベースの comment に戻す。
+phase comment は説明しすぎず、1文で自然に反応する。該当 phase がない場合は従来の event kind / emotion / description ベースの comment に戻す。
 
 ## Suppression Reason
 
