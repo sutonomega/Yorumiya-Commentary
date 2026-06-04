@@ -291,6 +291,22 @@ class CorePipelineTest(unittest.TestCase):
                 self.assertEqual(decision.reason, "combat_state")
                 self.assertEqual(decision.comment.text, "ここ、変化があったね。Combat state changed")
 
+    def test_comment_generator_uses_critical_moment_comment(self):
+        generator = CommentGenerator()
+        event = CommentaryEvent(
+            timestamp=1.0,
+            kind="critical_moment",
+            description="Critical moment detected",
+            salience=0.9,
+            should_speak=True,
+        )
+
+        decision = generator.evaluate(CommentaryContext(timestamp=1.0, event=event))
+
+        self.assertFalse(decision.suppressed)
+        self.assertEqual(decision.reason, "critical_moment")
+        self.assertEqual(decision.comment.text, "今のは大きいね")
+
     def test_comment_generator_reports_suppression_reasons(self):
         generator = CommentGenerator(policy=CommentPolicy(min_salience=0.5, stale_after_seconds=1.0))
         low_event = CommentaryEvent(timestamp=10.0, kind="label_change", description="small change", salience=0.2, should_speak=False)

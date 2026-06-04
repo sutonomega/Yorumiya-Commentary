@@ -193,6 +193,8 @@ class CommentGenerator:
             added = context.event.metadata.get("added", [])
             target = ", ".join(added[:2]) if isinstance(added, list) and added else ""
             return f"画面に{target}が増えたね" if target else "画面の要素が変わったね"
+        if context.event.kind == "critical_moment":
+            return "今のは大きいね"
 
         if emotion == "excited":
             return f"お、今かなり動いたね。{context.event.description}"
