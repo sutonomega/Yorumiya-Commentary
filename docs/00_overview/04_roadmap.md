@@ -10,9 +10,9 @@ Current implementation status is summarized in `05_milestone_status.md`.
 
 目的は、README の最小構成である「動画入力、フレーム解析、差分検出、AIコメント生成、音声読み上げ」を一つの流れとして成立させること。
 
-Status: in progress.
+Status: complete for MVP scope.
 
-土台として実装済み:
+確認済み:
 
 - `combat_state`
 - `event_phase`
@@ -26,13 +26,12 @@ Status: in progress.
 - `EventSelectionTrace`
 - `dialog_event` design docs
 - `dialog_event` phase detection
+- 実 mp4 入力から sampled frame / `review.jsonl` までの確認
+- MVP event detection acceptance cases
+- Ollama comment adapter boundary
+- `Comment -> SpeechItem -> voice adapter -> SpeechAudio` boundary
 
-MVP完了までに確認すること:
-
-- 実 mp4 入力から comment までの流れが、READMEのMVP項目に沿って確認できる。
-- AIコメント生成として受け入れられる最小の comment 品質を満たす。
-- 音声読み上げまでの end-to-end 境界を確認できる。
-- trace で、なぜその comment / suppression になったかを追える。
+Phase 1 は高品質な実況の完成ではなく、README の最小構成が adapter contract と trace で説明可能に流れることを完了条件にする。実況品質、言い換え、長期文脈、personality は Phase 2 以降で扱う。
 
 ### Phase 2: Commentary Quality
 
