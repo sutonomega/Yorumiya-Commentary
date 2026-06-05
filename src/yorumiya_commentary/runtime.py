@@ -209,6 +209,9 @@ class PipelineTrace:
     event_source: str | None
     scene_event_phase: str | None
     event_salience: float | None
+    emotion: str | None
+    emotion_atmosphere: str | None
+    emotion_excitement: float | None
     decision_reason: str
     decision_source: str
     suppressed: bool
@@ -228,6 +231,9 @@ class PipelineTrace:
             event_source=event.metadata.get("source", "scene") if event else None,
             scene_event_phase=_scene_event_phase(event),
             event_salience=event.salience if event else None,
+            emotion=result.context.emotion.emotion if result.context.emotion else None,
+            emotion_atmosphere=result.context.emotion.atmosphere if result.context.emotion else None,
+            emotion_excitement=result.context.emotion.excitement if result.context.emotion else None,
             decision_reason=result.comment_decision.reason,
             decision_source=_decision_source(result.comment_decision.reason),
             suppressed=result.comment_decision.suppressed,
@@ -246,6 +252,9 @@ class PipelineTrace:
             "event_source": self.event_source,
             "scene_event_phase": self.scene_event_phase,
             "event_salience": self.event_salience,
+            "emotion": self.emotion,
+            "emotion_atmosphere": self.emotion_atmosphere,
+            "emotion_excitement": self.emotion_excitement,
             "decision_reason": self.decision_reason,
             "decision_source": self.decision_source,
             "suppressed": self.suppressed,

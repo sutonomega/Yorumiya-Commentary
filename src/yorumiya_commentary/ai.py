@@ -124,7 +124,10 @@ class EmotionEstimator:
             excitement += min(0.2, context.vad.speech_ratio)
 
         excitement = max(0.0, min(1.0, excitement))
-        if excitement >= 0.7:
+        hinted_emotion = self._event_emotion_hint(context)
+        if hinted_emotion:
+            emotion, atmosphere = hinted_emotion
+        elif excitement >= 0.7:
             emotion = "excited"
             atmosphere = "high"
         elif excitement >= 0.35:
@@ -135,6 +138,25 @@ class EmotionEstimator:
             atmosphere = "quiet"
         speak_priority = excitement if not (context.vad and context.vad.is_speech) else excitement * 0.45
         return EmotionState(context.timestamp, excitement, emotion, atmosphere, speak_priority)
+
+    def _event_emotion_hint(self, context: CommentaryContext) -> tuple[str, str] | None:
+        event = context.event
+        if not event or event.kind != "critical_moment":
+            return None
+        labels = self._metadata_labels(event.metadata)
+        if {"danger", "damage", "hit"} & labels:
+            return "danger", "tense"
+        if {"explosion", "effect"} & labels:
+            return "surprised", "flashy"
+        return None
+
+    def _metadata_labels(self, metadata: dict[str, object]) -> set[str]:
+        labels: set[str] = set()
+        for key in ("labels", "added"):
+            value = metadata.get(key)
+            if isinstance(value, list):
+                labels.update(str(label) for label in value)
+        return labels
 
 
 class CommentGenerator:

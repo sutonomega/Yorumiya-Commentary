@@ -13,6 +13,9 @@
 - `event_source`
 - `scene_event_phase`
 - `event_salience`
+- `emotion`
+- `emotion_atmosphere`
+- `emotion_excitement`
 - `decision_reason`
 - `decision_source`
 - `suppressed`
