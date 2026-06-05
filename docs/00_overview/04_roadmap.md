@@ -65,6 +65,37 @@ Status: complete for MVP.
 6. personality
 7. 長期記憶
 
+## PR Issue Roadmap
+
+今後の作業は、1 PR = 1 Issue を基本単位にする。各 Issue には作業内容、ゴール、完了条件を明記し、PR は対応 Issue の完了条件だけを満たす小さな差分にする。
+
+### Immediate Issues
+
+1. Issue: [#77](https://github.com/sutonomega/Yorumiya-Commentary/issues/77) - `critical_moment` の detail comment を追加する。
+   - 作業内容: `metadata.labels` / `metadata.added` の `explosion` / `effect` を見て、汎用 critical comment とは別の短文 comment を返す。
+   - ゴール: OpenCV heuristic adapter で爆発/大きなエフェクトを検出した時に、「今のは大きいね」だけでなく見た目に合う短文 comment が出る。
+   - 完了条件: 通常の `critical_moment` は従来コメントのまま、`explosion` / `effect` 付きの `critical_moment` だけ detail comment になるテストがある。
+
+2. Issue: [#78](https://github.com/sutonomega/Yorumiya-Commentary/issues/78) - emotion を `critical_moment` の種類に合わせて拡張する。
+   - 作業内容: 現在の `calm` / `interested` / `excited` を土台に、`surprised` / `danger` などの追加方針と最小実装を行う。
+   - ゴール: 単に重要度が高いだけでなく、爆発、危険、ピンチなどの雰囲気を trace と comment 選択で扱えるようにする。
+   - 完了条件: emotion trace に新しい emotion が出るケースと、既存ケースが壊れないテストがある。
+
+3. Issue: [#81](https://github.com/sutonomega/Yorumiya-Commentary/issues/81) - comment variant map を追加する。
+   - 作業内容: phase / kind / detail comment に複数候補を持てる構造を追加する。
+   - ゴール: 同じ状況で常に同じ一文だけになる状態を緩和し、将来の口調調整へつなげる。
+   - 完了条件: 既定動作が安定してテスト可能で、既存の repeated suppression と衝突しない。
+
+4. Issue: [#80](https://github.com/sutonomega/Yorumiya-Commentary/issues/80) - suppression を意味単位で強化する。
+   - 作業内容: 同文だけでなく、同じ event kind / detail group の連続発話を抑制する方針を追加する。
+   - ゴール: `critical_moment` や爆発エフェクトが連続した時に、似た反応が並び続けるのを防ぐ。
+   - 完了条件: 同文ではないが同じ意味の comment が連続した場合に抑制されるテストがある。
+
+5. Issue: [#79](https://github.com/sutonomega/Yorumiya-Commentary/issues/79) - `dialog_event` metadata contract を実装へ進める。
+   - 作業内容: `speaker` / `text` / `choice` を scene metadata として扱う最小contractを決め、trace に残す。
+   - ゴール: 固定コメントを増やす前に、会話内容を使える土台を作る。
+   - 完了条件: `dialog_event` の metadata が `PipelineTrace` / `EventSelectionTrace` で確認できるテストがある。
+
 ## M1: Documentation Foundation
 
 - overview / requirements / architecture を整理する。
