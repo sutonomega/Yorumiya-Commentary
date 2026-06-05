@@ -70,6 +70,7 @@ class CommentDecision:
 class MemoryStore:
     def __init__(self, short_limit: int = 20, long_limit: int = 200):
         self.short_memory: deque[str] = deque(maxlen=short_limit)
+        self.semantic_memory: deque[str] = deque(maxlen=short_limit)
         self.long_memory: deque[str] = deque(maxlen=long_limit)
 
     def add(self, item: str, long_term: bool = False) -> None:
@@ -114,6 +115,15 @@ class MemoryStore:
 
     def is_repeated(self, text: str, window: int = 6) -> bool:
         return text in list(self.short_memory)[-window:]
+
+    def add_semantic_key(self, key: str) -> None:
+        normalized = " ".join(key.split())
+        if normalized:
+            self.semantic_memory.append(normalized)
+
+    def is_repeated_semantic_key(self, key: str, window: int = 6) -> bool:
+        normalized = " ".join(key.split())
+        return bool(normalized) and normalized in list(self.semantic_memory)[-window:]
 
 
 class EmotionEstimator:
@@ -180,10 +190,15 @@ class CommentGenerator:
 
         text, priority, reason = template
         text = self._trim(text)
+        semantic_key = self._semantic_suppression_key(context)
+        if semantic_key and self.memory.is_repeated_semantic_key(semantic_key):
+            return CommentDecision(comment=None, suppressed=True, reason=SUPPRESSION_REPEATED_COMMENT)
         if self.memory.is_repeated(text):
             return CommentDecision(comment=None, suppressed=True, reason=SUPPRESSION_REPEATED_COMMENT)
 
         self.memory.add(text)
+        if semantic_key:
+            self.memory.add_semantic_key(semantic_key)
         return CommentDecision(comment=Comment(timestamp=context.timestamp, text=text, priority=priority, reason=reason), suppressed=False, reason=reason)
 
     def generate(self, context: CommentaryContext) -> Comment | None:
@@ -259,6 +274,17 @@ class CommentGenerator:
         labels = self._metadata_labels(metadata)
         if {"explosion", "effect"} & labels:
             return self._select_comment_variant(CRITICAL_DETAIL_COMMENT_VARIANTS["explosion_effect"])
+        return None
+
+    def _semantic_suppression_key(self, context: CommentaryContext) -> str | None:
+        event = context.event
+        if not event:
+            return None
+        if event.kind == "critical_moment":
+            labels = self._metadata_labels(event.metadata)
+            if {"explosion", "effect"} & labels:
+                return "critical_moment:explosion_effect"
+            return "critical_moment"
         return None
 
     def _select_comment_variant(self, variants: tuple[str, ...] | None) -> str | None:

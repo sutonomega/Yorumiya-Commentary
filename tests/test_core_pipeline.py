@@ -691,6 +691,59 @@ class CorePipelineTest(unittest.TestCase):
         self.assertFalse(first.suppressed)
         self.assertEqual(second.reason, "repeated_comment")
 
+    def test_comment_generator_suppresses_repeated_semantic_group_with_different_text(self):
+        class AlternatingVariantGenerator(CommentGenerator):
+            def __init__(self):
+                super().__init__()
+                self.calls = 0
+
+            def _select_comment_variant(self, variants):
+                if variants == CRITICAL_DETAIL_COMMENT_VARIANTS["explosion_effect"]:
+                    self.calls += 1
+                    return ("すごいエフェクト出たね", "派手なエフェクトだね")[self.calls - 1]
+                return super()._select_comment_variant(variants)
+
+        generator = AlternatingVariantGenerator()
+        event = CommentaryEvent(
+            timestamp=1.0,
+            kind="critical_moment",
+            description="Critical moment detected",
+            salience=0.9,
+            should_speak=True,
+            metadata={"labels": ["explosion", "critical"]},
+        )
+
+        first = generator.evaluate(CommentaryContext(timestamp=1.0, event=event))
+        second = generator.evaluate(CommentaryContext(timestamp=2.0, event=event))
+
+        self.assertFalse(first.suppressed)
+        self.assertEqual(first.comment.text, "すごいエフェクト出たね")
+        self.assertTrue(second.suppressed)
+        self.assertEqual(second.reason, "repeated_comment")
+        self.assertIsNone(second.comment)
+
+    def test_pipeline_trace_records_repeated_semantic_suppression(self):
+        video = VideoInput(
+            [
+                {"summary": "field view", "labels": ["field"], "confidence": 0.7},
+                {"summary": "explosion effect", "labels": ["field", "explosion", "critical"], "confidence": 0.9},
+                {"summary": "field view again", "labels": ["field"], "confidence": 0.7},
+                {"summary": "another explosion effect", "labels": ["field", "effect", "critical"], "confidence": 0.9},
+            ],
+            fps=1,
+        )
+        pipeline = RealtimePipeline()
+        frames = list(video.iter_frames())
+
+        pipeline.trace_step(frames[0])
+        pipeline.trace_step(frames[1])
+        pipeline.trace_step(frames[2])
+        trace = pipeline.trace_step(frames[3])
+
+        self.assertTrue(trace.suppressed)
+        self.assertEqual(trace.decision_reason, "repeated_comment")
+        self.assertEqual(trace.as_dict()["decision_reason"], "repeated_comment")
+
     def test_comment_generator_allows_low_confidence_transcript_and_high_salience_event(self):
         generator = CommentGenerator(
             policy=CommentPolicy(
