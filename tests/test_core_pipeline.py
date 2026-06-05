@@ -218,7 +218,7 @@ class CorePipelineTest(unittest.TestCase):
 
         self.assertEqual(results[1].context.event.kind, "critical_moment")
         self.assertEqual(results[1].context.scene.summary, "explosion effect video frame 1280x720")
-        self.assertEqual(results[1].comment_decision.comment.text, "今のは大きいね")
+        self.assertEqual(results[1].comment_decision.comment.text, "すごいエフェクト出たね")
 
     def test_export_mp4_commentary_review_writes_frames_and_jsonl(self):
         fake_cv2 = FakeCv2([FakeImage(220)], fps=1)
@@ -286,7 +286,7 @@ class CorePipelineTest(unittest.TestCase):
             self.assertEqual(rows[1]["vision_adapter"], "OpenCVHeuristicVisionAdapter")
             self.assertEqual(written_rows[1]["vision_adapter"], "OpenCVHeuristicVisionAdapter")
             self.assertEqual(written_rows[1]["event_kind"], "critical_moment")
-            self.assertEqual(written_rows[1]["comment"], "今のは大きいね")
+            self.assertEqual(written_rows[1]["comment"], "すごいエフェクト出たね")
 
     def test_frame_sampler_policy_limits_range_and_count(self):
         video = VideoInput(["f0", "f1", "f2", "f3", "f4"], fps=1)
@@ -580,6 +580,30 @@ class CorePipelineTest(unittest.TestCase):
         self.assertFalse(decision.suppressed)
         self.assertEqual(decision.reason, "critical_moment")
         self.assertEqual(decision.comment.text, "今のは大きいね")
+
+    def test_comment_generator_uses_critical_detail_comment_for_explosion(self):
+        cases = (
+            {"labels": ["video_frame", "explosion"]},
+            {"added": ["effect", "critical"]},
+        )
+
+        for metadata in cases:
+            with self.subTest(metadata=metadata):
+                generator = CommentGenerator()
+                event = CommentaryEvent(
+                    timestamp=1.0,
+                    kind="critical_moment",
+                    description="Critical moment detected",
+                    salience=0.9,
+                    should_speak=True,
+                    metadata=metadata,
+                )
+
+                decision = generator.evaluate(CommentaryContext(timestamp=1.0, event=event))
+
+                self.assertFalse(decision.suppressed)
+                self.assertEqual(decision.reason, "critical_moment")
+                self.assertEqual(decision.comment.text, "すごいエフェクト出たね")
 
     def test_comment_generator_uses_objective_update_comment(self):
         generator = CommentGenerator()
