@@ -157,6 +157,8 @@ Pipeline や module構成。
 
 scheduler や logging などの実行基盤。
 
+- Local MVP runtime: `docs/07_runtime/05_local_mvp_runtime.md`
+
 ---
 
 ## Experiments
