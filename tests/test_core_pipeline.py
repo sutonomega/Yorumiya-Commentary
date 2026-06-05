@@ -894,6 +894,69 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(trace.event_selection.scene_event_phase, "dialog_choice")
         self.assertEqual(trace.event_selection.as_dict()["scene_event_phase"], "dialog_choice")
 
+    def test_emotion_estimator_uses_critical_moment_detail_hints(self):
+        cases = (
+            ({"labels": ["video_frame", "explosion"]}, "surprised", "flashy"),
+            ({"added": ["damage", "critical"]}, "danger", "tense"),
+        )
+
+        for metadata, expected_emotion, expected_atmosphere in cases:
+            with self.subTest(metadata=metadata):
+                event = CommentaryEvent(
+                    timestamp=1.0,
+                    kind="critical_moment",
+                    description="Critical moment detected",
+                    salience=0.9,
+                    should_speak=True,
+                    metadata=metadata,
+                )
+
+                emotion = EmotionEstimator().estimate(CommentaryContext(timestamp=1.0, event=event))
+
+                self.assertEqual(emotion.emotion, expected_emotion)
+                self.assertEqual(emotion.atmosphere, expected_atmosphere)
+                self.assertGreater(emotion.excitement, 0.0)
+
+    def test_emotion_estimator_keeps_existing_thresholds(self):
+        calm = EmotionEstimator().estimate(CommentaryContext(timestamp=1.0))
+        interested_event = CommentaryEvent(timestamp=1.0, kind="scene_change", description="Scene changed", salience=0.9, should_speak=True)
+        interested = EmotionEstimator().estimate(CommentaryContext(timestamp=1.0, event=interested_event))
+        excited = EmotionEstimator().estimate(
+            CommentaryContext(
+                timestamp=1.0,
+                event=interested_event,
+                audio=AudioAnalyzer().analyze(AudioChunk(timestamp=1.0, samples=(0.3, 0.4, 0.5), sample_rate=3)),
+            )
+        )
+
+        self.assertEqual(calm.emotion, "calm")
+        self.assertEqual(calm.atmosphere, "quiet")
+        self.assertEqual(interested.emotion, "interested")
+        self.assertEqual(interested.atmosphere, "active")
+        self.assertEqual(excited.emotion, "excited")
+        self.assertEqual(excited.atmosphere, "high")
+
+    def test_pipeline_trace_records_emotion_state(self):
+        video = VideoInput(
+            [
+                {"summary": "field view", "labels": ["field"], "confidence": 0.7},
+                {"summary": "explosion effect", "labels": ["field", "explosion", "critical"], "confidence": 0.9},
+            ],
+            fps=1,
+        )
+        pipeline = RealtimePipeline()
+        frames = list(video.iter_frames())
+
+        pipeline.trace_step(frames[0])
+        trace = pipeline.trace_step(frames[1])
+
+        self.assertEqual(trace.event_kind, "critical_moment")
+        self.assertEqual(trace.emotion, "surprised")
+        self.assertEqual(trace.emotion_atmosphere, "flashy")
+        self.assertGreater(trace.emotion_excitement, 0.0)
+        self.assertEqual(trace.as_dict()["emotion"], "surprised")
+        self.assertEqual(trace.as_dict()["emotion_atmosphere"], "flashy")
+
     def test_trace_step_records_suppressed_decision_and_queue_count(self):
         video = VideoInput(["same scene", "same scene"], fps=1)
         pipeline = RealtimePipeline()
