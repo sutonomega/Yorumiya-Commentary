@@ -1098,6 +1098,57 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(trace.event_selection.scene_event_phase, "dialog_choice")
         self.assertEqual(trace.event_selection.as_dict()["scene_event_phase"], "dialog_choice")
 
+    def test_pipeline_trace_records_mvp_event_detection_acceptance_cases(self):
+        video = VideoInput(
+            [
+                {"summary": "field view", "labels": ["field"], "confidence": 0.7},
+                {"summary": "battle starts", "labels": ["field", "battle"], "confidence": 0.8},
+                {"summary": "enemy appears", "labels": ["field", "battle", "enemy"], "confidence": 0.85},
+                {"summary": "boss appears", "labels": ["battle", "enemy", "boss"], "confidence": 0.9},
+                {"summary": "critical hit", "labels": ["battle", "enemy", "boss", "critical", "hit"], "confidence": 0.95},
+                {"summary": "field again", "labels": ["field"], "confidence": 0.8},
+                {"summary": "dialog appears", "labels": ["field", "dialog"], "confidence": 0.85, "speaker": "Guide", "text": "Take this road."},
+                {
+                    "summary": "dialog choice appears",
+                    "labels": ["field", "dialog", "choice"],
+                    "confidence": 0.9,
+                    "speaker": "Guide",
+                    "text": "Take this road.",
+                    "choice": "left path",
+                },
+                {"summary": "dialog closed", "labels": ["field"], "confidence": 0.8},
+            ],
+            fps=1,
+        )
+        pipeline = RealtimePipeline()
+
+        traces = [pipeline.trace_step(frame) for frame in video.iter_frames()]
+
+        expected = [
+            ("scene_initial", None),
+            ("combat_state", "combat_start"),
+            ("combat_state", "enemy_appeared"),
+            ("combat_state", "boss_appeared"),
+            ("critical_moment", None),
+            ("combat_state", "combat_end"),
+            ("dialog_event", "dialog_start"),
+            ("dialog_event", "dialog_choice"),
+            ("dialog_event", "dialog_end"),
+        ]
+        self.assertEqual([(trace.event_kind, trace.scene_event_phase) for trace in traces], expected)
+        for trace, (event_kind, event_phase) in zip(traces, expected):
+            with self.subTest(event_kind=event_kind, event_phase=event_phase):
+                self.assertEqual(trace.event_selection.selected_source, "scene")
+                self.assertEqual(trace.event_selection.scene_event_kind, event_kind)
+                self.assertEqual(trace.event_selection.scene_event_phase, event_phase)
+                self.assertEqual(trace.as_dict()["event_kind"], event_kind)
+                self.assertEqual(trace.as_dict()["scene_event_phase"], event_phase)
+
+        self.assertEqual(traces[7].dialog_speaker, "Guide")
+        self.assertEqual(traces[7].dialog_text, "Take this road.")
+        self.assertEqual(traces[7].dialog_choice, "left path")
+        self.assertEqual(traces[7].event_selection.scene_dialog_choice, "left path")
+
     def test_pipeline_and_selection_trace_record_dialog_metadata(self):
         video = VideoInput(
             [
