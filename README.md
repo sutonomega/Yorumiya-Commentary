@@ -32,31 +32,35 @@ AIが常に喋り続けるのではなく、
 
 ---
 
-# Current MVP Scope
+# Current Status
 
-現在は、
-最小構成（MVP）として：
+最小構成（MVP）は成立済み。
 
-- 動画入力
-- フレーム解析
-- 差分検出
-- AIコメント生成
-- 音声読み上げ
+現在の core pipeline は次の流れを外部 service なしの tests で確認している。
 
-の成立を目指している。
+```txt
+Frame
+  -> SceneState
+  -> CommentaryEvent
+  -> CommentaryContext
+  -> Comment
+  -> SpeechItem
+```
+
+実 mp4 入力、sampled frame review、短文 comment、suppression、trace も動作する。MVP後は、実況品質、言い換え、会話内容利用、personality、長期文脈を段階的に改善する。
 
 ---
 
-# Planned Features
+# Post-MVP Features
 
-将来的には：
+今後の改善候補：
 
-- リアルタイム実況
+- 実況品質向上
+- comment 言い換え
+- 会話内容利用
+- personality
+- 長期文脈
 - OBS連携
-- Whisper統合
-- VAD
-- 感情推定
-- Companion Mode
 
 なども検討している。
 
