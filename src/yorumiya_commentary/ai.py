@@ -16,18 +16,23 @@ SUPPRESSION_STALE_CONTEXT = "stale_context"
 SUPPRESSION_NO_SIGNAL = "no_signal"
 
 
-EVENT_PHASE_COMMENTS = {
-    "combat_start": "戦闘が始まったね",
-    "enemy_appeared": "敵が出てきたね",
-    "boss_appeared": "ボスだ",
-    "combat_end": "ひと段落ついたね",
+EVENT_PHASE_COMMENT_VARIANTS = {
+    "combat_start": ("戦闘が始まったね",),
+    "enemy_appeared": ("敵が出てきたね",),
+    "boss_appeared": ("ボスだ",),
+    "combat_end": ("ひと段落ついたね",),
 }
 
 
-EVENT_KIND_COMMENTS = {
-    "critical_moment": "今のは大きいね",
-    "objective_update": "目標が更新されたね",
-    "item_update": "何か手に入ったね",
+EVENT_KIND_COMMENT_VARIANTS = {
+    "critical_moment": ("今のは大きいね",),
+    "objective_update": ("目標が更新されたね",),
+    "item_update": ("何か手に入ったね",),
+}
+
+
+CRITICAL_DETAIL_COMMENT_VARIANTS = {
+    "explosion_effect": ("すごいエフェクト出たね",),
 }
 
 
@@ -233,7 +238,7 @@ class CommentGenerator:
         critical_detail_comment = self._critical_detail_comment(context.event.kind, context.event.metadata)
         if critical_detail_comment:
             return critical_detail_comment
-        event_kind_comment = EVENT_KIND_COMMENTS.get(context.event.kind)
+        event_kind_comment = self._select_comment_variant(EVENT_KIND_COMMENT_VARIANTS.get(context.event.kind))
         if event_kind_comment:
             return event_kind_comment
 
@@ -246,15 +251,20 @@ class CommentGenerator:
     def _event_phase_comment(self, event_phase: object) -> str | None:
         if not isinstance(event_phase, str):
             return None
-        return EVENT_PHASE_COMMENTS.get(event_phase)
+        return self._select_comment_variant(EVENT_PHASE_COMMENT_VARIANTS.get(event_phase))
 
     def _critical_detail_comment(self, kind: str, metadata: dict[str, object]) -> str | None:
         if kind != "critical_moment":
             return None
         labels = self._metadata_labels(metadata)
         if {"explosion", "effect"} & labels:
-            return "すごいエフェクト出たね"
+            return self._select_comment_variant(CRITICAL_DETAIL_COMMENT_VARIANTS["explosion_effect"])
         return None
+
+    def _select_comment_variant(self, variants: tuple[str, ...] | None) -> str | None:
+        if not variants:
+            return None
+        return variants[0]
 
     def _metadata_labels(self, metadata: dict[str, object]) -> set[str]:
         labels: set[str] = set()
