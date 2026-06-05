@@ -248,6 +248,10 @@ class CorePipelineTest(unittest.TestCase):
 
             self.assertEqual(len(rows), 1)
             self.assertIsNone(written_rows[0]["vision_adapter"])
+            self.assertEqual(rows[0]["frame_index"], 0)
+            self.assertEqual(rows[0]["frame_source"], "sample.mp4")
+            self.assertEqual(written_rows[0]["frame_index"], 0)
+            self.assertEqual(written_rows[0]["frame_source"], "sample.mp4")
             self.assertEqual(written_rows[0]["decision_reason"], "scene_initial")
             self.assertFalse(written_rows[0]["suppressed"])
             self.assertIsNotNone(written_rows[0]["comment"])

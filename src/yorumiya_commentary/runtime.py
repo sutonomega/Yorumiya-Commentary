@@ -796,6 +796,8 @@ def export_mp4_commentary_review(
         row = {
             "index": output_index,
             "timestamp": frame.timestamp,
+            "frame_index": frame.index,
+            "frame_source": frame.source,
             "vision_adapter": vision_adapter_name,
             "frame_path": str(image_path),
             "frame_data": frame_data,
