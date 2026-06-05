@@ -1,7 +1,9 @@
 import json
+import sys
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from yorumiya_commentary import (
     AudioAnalyzer,
@@ -20,6 +22,7 @@ from yorumiya_commentary import (
     FrameSampler,
     FrameSamplingPolicy,
     MemoryStore,
+    OpenCVVideoInput,
     RealtimeLoop,
     RealtimePipeline,
     RealtimeScheduler,
@@ -38,8 +41,61 @@ from yorumiya_commentary import (
     VoiceSynthesisError,
     WhisperTranscriber,
     comment_to_speech_item,
+    export_mp4_commentary_review,
+    run_mp4_commentary,
 )
 from yorumiya_commentary.models import AudioChunk, Comment, CommentaryContext, CommentaryEvent, SpeechAudio, SpeechItem, Transcript, VadResult
+
+
+class FakeImage:
+    def __init__(self, brightness, shape=(720, 1280, 3)):
+        self.brightness = brightness
+        self.shape = shape
+
+    def mean(self):
+        return self.brightness
+
+
+class FakeVideoCapture:
+    def __init__(self, images, fps=1.0, opened=True):
+        self.images = list(images)
+        self.fps = fps
+        self.opened = opened
+        self.index = 0
+        self.released = False
+
+    def isOpened(self):
+        return self.opened
+
+    def get(self, prop):
+        return self.fps
+
+    def read(self):
+        if self.index >= len(self.images):
+            return False, None
+        image = self.images[self.index]
+        self.index += 1
+        return True, image
+
+    def release(self):
+        self.released = True
+
+
+class FakeCv2:
+    CAP_PROP_FPS = 5
+
+    def __init__(self, images, fps=1.0):
+        self.images = list(images)
+        self.fps = fps
+        self.capture = None
+
+    def VideoCapture(self, path):
+        self.capture = FakeVideoCapture(self.images, fps=self.fps)
+        return self.capture
+
+    def imwrite(self, path, image):
+        Path(path).write_bytes(b"fake-jpeg")
+        return True
 
 
 class CorePipelineTest(unittest.TestCase):
@@ -65,6 +121,48 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(frames[0].data, "menu score")
         self.assertEqual(frames[1].timestamp, 2.5)
         self.assertEqual(frames[1].data, "battle critical")
+
+    def test_opencv_video_input_reads_mp4_frames_as_scene_metadata(self):
+        fake_cv2 = FakeCv2([FakeImage(30), FakeImage(220)], fps=1)
+
+        with patch.dict(sys.modules, {"cv2": fake_cv2}):
+            frames = list(OpenCVVideoInput("sample.mp4", sample_interval_seconds=1.0).iter_frames())
+
+        self.assertEqual(len(frames), 2)
+        self.assertEqual(frames[0].timestamp, 0.0)
+        self.assertEqual(frames[0].source, "sample.mp4")
+        self.assertEqual(frames[0].data["labels"], ["video_frame", "dark_scene", "wide_frame"])
+        self.assertEqual(frames[1].data["labels"], ["video_frame", "bright_scene", "wide_frame"])
+        self.assertTrue(fake_cv2.capture.released)
+
+    def test_run_mp4_commentary_returns_comment_decisions(self):
+        fake_cv2 = FakeCv2([FakeImage(220)], fps=1)
+
+        with patch.dict(sys.modules, {"cv2": fake_cv2}):
+            results = run_mp4_commentary("sample.mp4", max_frames=1)
+
+        self.assertEqual(len(results), 1)
+        self.assertFalse(results[0].comment_decision.suppressed)
+        self.assertIsNotNone(results[0].comment_decision.comment)
+        self.assertEqual(results[0].comment_decision.reason, "scene_initial")
+
+    def test_export_mp4_commentary_review_writes_frames_and_jsonl(self):
+        fake_cv2 = FakeCv2([FakeImage(220)], fps=1)
+
+        with TemporaryDirectory() as temp_dir:
+            with patch.dict(sys.modules, {"cv2": fake_cv2}):
+                rows = export_mp4_commentary_review("sample.mp4", temp_dir, max_frames=1)
+
+            review_path = Path(temp_dir) / "review.jsonl"
+            written_rows = [json.loads(line) for line in review_path.read_text(encoding="utf-8").splitlines()]
+
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(written_rows[0]["decision_reason"], "scene_initial")
+            self.assertFalse(written_rows[0]["suppressed"])
+            self.assertIsNotNone(written_rows[0]["comment"])
+            self.assertEqual(written_rows[0]["frame_data"]["labels"], ["video_frame", "bright_scene", "wide_frame"])
+            self.assertNotIn("image", written_rows[0]["frame_data"])
+            self.assertTrue(Path(written_rows[0]["frame_path"]).exists())
 
     def test_frame_sampler_policy_limits_range_and_count(self):
         video = VideoInput(["f0", "f1", "f2", "f3", "f4"], fps=1)

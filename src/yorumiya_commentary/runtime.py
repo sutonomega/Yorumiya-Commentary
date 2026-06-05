@@ -23,6 +23,7 @@ from .audio import AudioAnalyzer, AudioEventDetector, TranscriptEventDetector, V
 from .event import EventDetector
 from .models import AudioChunk, CommentaryContext, CommentaryEvent, Frame, SpeechAudio, SpeechItem
 from .scene import SceneAnalyzer
+from .video import OpenCVVideoInput
 from .voice import AudioPlayer, PlaybackResult, SpeechStyle, SpeechSynthesizer, comment_to_speech_item
 
 
@@ -703,6 +704,82 @@ class RuntimeService:
             "traces": len(self.recorder.traces),
             "file_recorder": str(self.file_recorder.path) if self.file_recorder else None,
         }
+
+
+def run_mp4_commentary(
+    path: str | Path,
+    *,
+    pipeline: RealtimePipeline | None = None,
+    sample_interval_seconds: float = 2.0,
+    start_timestamp: float = 0.0,
+    end_timestamp: float | None = None,
+    max_frames: int | None = None,
+    synthesize: bool = False,
+) -> list[PipelineStepResult]:
+    video = OpenCVVideoInput(
+        path,
+        sample_interval_seconds=sample_interval_seconds,
+        start_timestamp=start_timestamp,
+        end_timestamp=end_timestamp,
+        max_frames=max_frames,
+    )
+    resolved_pipeline = pipeline or RealtimePipeline()
+    return [resolved_pipeline.process_frame_step(frame, synthesize=synthesize) for frame in video.iter_frames()]
+
+
+def export_mp4_commentary_review(
+    path: str | Path,
+    output_dir: str | Path,
+    *,
+    pipeline: RealtimePipeline | None = None,
+    sample_interval_seconds: float = 2.0,
+    start_timestamp: float = 0.0,
+    end_timestamp: float | None = None,
+    max_frames: int | None = None,
+) -> list[dict[str, object]]:
+    output = Path(output_dir)
+    output.mkdir(parents=True, exist_ok=True)
+    video = OpenCVVideoInput(
+        path,
+        sample_interval_seconds=sample_interval_seconds,
+        start_timestamp=start_timestamp,
+        end_timestamp=end_timestamp,
+        max_frames=max_frames,
+        include_image=True,
+    )
+    cv2 = video._load_cv2()
+    resolved_pipeline = pipeline or RealtimePipeline()
+    rows: list[dict[str, object]] = []
+
+    for output_index, frame in enumerate(video.iter_frames()):
+        data = frame.data if isinstance(frame.data, dict) else {}
+        image = data.get("image")
+        image_path = output / f"frame_{output_index:04d}_{frame.timestamp:.3f}s.jpg"
+        if image is not None and not cv2.imwrite(str(image_path), image):
+            raise ValueError(f"failed to write frame image: {image_path}")
+        frame_data = {key: value for key, value in data.items() if key != "image"}
+
+        result = resolved_pipeline.process_frame_step(frame)
+        event = result.context.event
+        comment = result.comment_decision.comment
+        row = {
+            "index": output_index,
+            "timestamp": frame.timestamp,
+            "frame_path": str(image_path),
+            "frame_data": frame_data,
+            "scene_summary": result.context.scene.summary if result.context.scene else None,
+            "scene_labels": list(result.context.scene.labels) if result.context.scene else [],
+            "event_kind": event.kind if event else None,
+            "event_phase": event.metadata.get("event_phase") if event else None,
+            "decision_reason": result.comment_decision.reason,
+            "suppressed": result.comment_decision.suppressed,
+            "comment": comment.text if comment else None,
+        }
+        rows.append(row)
+
+    review_path = output / "review.jsonl"
+    review_path.write_text("\n".join(json.dumps(row, ensure_ascii=False) for row in rows) + ("\n" if rows else ""), encoding="utf-8")
+    return rows
 
 
 def _scene_event_phase(event: CommentaryEvent | None) -> str | None:

@@ -9,6 +9,9 @@ description = "Modular realtime companion commentary pipeline."
 readme = "README.md"
 requires-python = ">=3.10"
 
+[project.optional-dependencies]
+video = ["opencv-python-headless>=4.8"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
