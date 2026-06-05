@@ -275,6 +275,8 @@ results = run_mp4_commentary(
 )
 ```
 
+review log で確認する場合は `export_mp4_commentary_review(..., vision_adapter=OpenCVHeuristicVisionAdapter())` を使う。`review.jsonl` の `vision_adapter` に adapter 名が出る。
+
 ---
 
 # Notes

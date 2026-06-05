@@ -14,6 +14,8 @@
 - 明るい爆発/エフェクトを `critical_moment` へ流し、「今のは大きいね」のような短文 comment を出せるようにする。
 - 将来の VLM / OCR / object detector へ置き換える前の、軽量な baseline を用意する。
 
+`export_mp4_commentary_review()` の `review.jsonl` には、直接渡した adapter 名が `vision_adapter` として出る。これにより、default metadata だけで処理したのか、`OpenCVHeuristicVisionAdapter` を通したのかを log から確認できる。
+
 制約:
 
 - 画像の意味理解はしない。

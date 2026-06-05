@@ -231,6 +231,7 @@ class CorePipelineTest(unittest.TestCase):
             written_rows = [json.loads(line) for line in review_path.read_text(encoding="utf-8").splitlines()]
 
             self.assertEqual(len(rows), 1)
+            self.assertIsNone(written_rows[0]["vision_adapter"])
             self.assertEqual(written_rows[0]["decision_reason"], "scene_initial")
             self.assertFalse(written_rows[0]["suppressed"])
             self.assertIsNotNone(written_rows[0]["comment"])
@@ -260,10 +261,32 @@ class CorePipelineTest(unittest.TestCase):
             written_rows = [json.loads(line) for line in review_path.read_text(encoding="utf-8").splitlines()]
 
             self.assertEqual(rows[1]["scene_summary"], "enemy battle")
+            self.assertEqual(written_rows[1]["vision_adapter"], "vision_adapter")
             self.assertEqual(written_rows[1]["scene_labels"], ["field", "enemy", "battle"])
             self.assertEqual(written_rows[1]["event_kind"], "combat_state")
             self.assertEqual(written_rows[1]["event_phase"], "enemy_appeared")
             self.assertEqual(written_rows[1]["comment"], "敵が出てきたね")
+
+    def test_export_mp4_commentary_review_logs_opencv_heuristic_adapter_name(self):
+        fake_cv2 = FakeCv2([FakeImage(90), FakeImage(180, effect_ratio=0.12, orange_ratio=0.05)], fps=1)
+
+        with TemporaryDirectory() as temp_dir:
+            with patch.dict(sys.modules, {"cv2": fake_cv2}):
+                rows = export_mp4_commentary_review(
+                    "sample.mp4",
+                    temp_dir,
+                    vision_adapter=OpenCVHeuristicVisionAdapter(),
+                    sample_interval_seconds=1.0,
+                    max_frames=2,
+                )
+
+            review_path = Path(temp_dir) / "review.jsonl"
+            written_rows = [json.loads(line) for line in review_path.read_text(encoding="utf-8").splitlines()]
+
+            self.assertEqual(rows[1]["vision_adapter"], "OpenCVHeuristicVisionAdapter")
+            self.assertEqual(written_rows[1]["vision_adapter"], "OpenCVHeuristicVisionAdapter")
+            self.assertEqual(written_rows[1]["event_kind"], "critical_moment")
+            self.assertEqual(written_rows[1]["comment"], "今のは大きいね")
 
     def test_frame_sampler_policy_limits_range_and_count(self):
         video = VideoInput(["f0", "f1", "f2", "f3", "f4"], fps=1)
