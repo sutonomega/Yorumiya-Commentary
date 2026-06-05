@@ -10,7 +10,7 @@ Current implementation status is summarized in `05_milestone_status.md`.
 
 目的は、ゲームの状況を検出し、自然な短文 comment を出し、なぜそうなったかを trace で追える状態にすること。
 
-現在はこの phase にいる。
+Status: complete for MVP.
 
 完了済み:
 
@@ -24,12 +24,13 @@ Current implementation status is summarized in `05_milestone_status.md`.
 - repeated suppression
 - `PipelineTrace`
 - `EventSelectionTrace`
+- `dialog_event` design docs
+- `dialog_event` phase detection
 
-次にやる:
+今後の拡張候補:
 
-- `dialog_event` 設計を実装前に docs で整理する。
-- `dialog_event` metadata として `speaker`、`text`、`choice` を検討する。
-- `event_phase` を combat 以外へ拡張する。候補は `dialog_start`、`dialog_choice`、`dialog_end`。
+- `dialog_event` metadata として `speaker`、`text`、`choice` を実装する。
+- `event_phase` をさらに combat / dialog 以外へ拡張する。
 - comment 選択ロジックは、対象が増えて複雑化した場合に `_event_phase_comment()` と `_event_kind_comment()` の責務整理を検討する。
 
 ### Phase 2: Commentary Quality
