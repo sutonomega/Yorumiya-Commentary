@@ -171,11 +171,13 @@ scheduler や logging などの実行基盤。
 
 現在は：
 
-- ドキュメント設計
-- architecture整理
-- MVP定義
+- README の最小構成（MVP）に対する adapter boundary と受け入れテスト
+- 実MP4 review によるフレーム確認
+- Ollama / VOICEVOX を差し込むためのローカル実行手順
 
-を進めている段階。
+まで整理済み。
+
+次は実況品質の改善として、emotion、comment variants、suppression、personality などを段階的に強化する。
 
 ---
 

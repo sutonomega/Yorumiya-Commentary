@@ -158,14 +158,14 @@ This confirms the `Comment -> SpeechItem -> voice adapter -> SpeechAudio` bounda
 
 ## MVP Confirmation Scope
 
-This document covers local service startup and health checks. It does not complete the MVP by itself.
+This document covers local service startup, health checks, manual MP4 review, Ollama comment boundary, and offline voice boundary checks.
 
-MVP confirmation still needs issue-level checks for:
+MVP confirmation is covered by:
 
-- video input
-- frame analysis
-- diff detection
-- AI comment generation through Ollama
-- voice output through VOICEVOX
+- video input and frame review: sampled frames plus `review.jsonl`
+- frame analysis: `scene_summary` / `scene_labels` / `frame_data` in review rows
+- diff detection: MVP event detection acceptance cases in tests
+- AI comment generation boundary: `OllamaCommentAdapter` with template fallback
+- voice output boundary: `FakeVoiceSynthesizer` for automated checks, VOICEVOX ENGINE for local manual integration
 
-If the commands above become stable and repetitive, create a separate issue for a script such as `scripts/check_local_mvp.sh`.
+Live Ollama / VOICEVOX validation remains local integration work. If the commands above become stable and repetitive, create a separate issue for a script such as `scripts/check_local_mvp.sh`.
