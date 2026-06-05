@@ -223,6 +223,23 @@ for result in results:
         print(result.comment_decision.comment.text)
 ```
 
+sampled frame と comment decision を並べて確認したい場合は、review export を使う。
+
+```python
+from yorumiya_commentary import export_mp4_commentary_review
+
+rows = export_mp4_commentary_review(
+    "tests/fixtures/manual/Legacy.mp4",
+    "tests/fixtures/manual/legacy_review",
+    sample_interval_seconds=10.0,
+    max_frames=5,
+)
+for row in rows:
+    print(row["frame_path"], row["scene_summary"], row["comment"])
+```
+
+`review.jsonl` と sampled frame image が出力されるため、実際のシーンと comment を目視で確認できる。
+
 内蔵の mp4 adapter は軽量な visual metadata だけを作る。ゲーム固有の理解を行う場合は、`SceneAnalyzer(vision_adapter=...)` に vision model / OCR / object detector を接続する。
 
 ---

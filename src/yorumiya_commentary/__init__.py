@@ -32,6 +32,7 @@ from .runtime import (
     SpeechStepResult,
     SpeechTrace,
     TaskQueue,
+    export_mp4_commentary_review,
     run_mp4_commentary,
 )
 from .scene import SceneAnalysisConfig, SceneAnalyzer
@@ -101,5 +102,6 @@ __all__ = [
     "VoicevoxSynthesizer",
     "WhisperTranscriber",
     "comment_to_speech_item",
+    "export_mp4_commentary_review",
     "run_mp4_commentary",
 ]

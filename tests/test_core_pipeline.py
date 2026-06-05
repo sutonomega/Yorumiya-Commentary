@@ -41,6 +41,7 @@ from yorumiya_commentary import (
     VoiceSynthesisError,
     WhisperTranscriber,
     comment_to_speech_item,
+    export_mp4_commentary_review,
     run_mp4_commentary,
 )
 from yorumiya_commentary.models import AudioChunk, Comment, CommentaryContext, CommentaryEvent, SpeechAudio, SpeechItem, Transcript, VadResult
@@ -92,6 +93,10 @@ class FakeCv2:
         self.capture = FakeVideoCapture(self.images, fps=self.fps)
         return self.capture
 
+    def imwrite(self, path, image):
+        Path(path).write_bytes(b"fake-jpeg")
+        return True
+
 
 class CorePipelineTest(unittest.TestCase):
     def test_video_sampling_and_realtime_pipeline_enqueues_speech(self):
@@ -140,6 +145,24 @@ class CorePipelineTest(unittest.TestCase):
         self.assertFalse(results[0].comment_decision.suppressed)
         self.assertIsNotNone(results[0].comment_decision.comment)
         self.assertEqual(results[0].comment_decision.reason, "scene_initial")
+
+    def test_export_mp4_commentary_review_writes_frames_and_jsonl(self):
+        fake_cv2 = FakeCv2([FakeImage(220)], fps=1)
+
+        with TemporaryDirectory() as temp_dir:
+            with patch.dict(sys.modules, {"cv2": fake_cv2}):
+                rows = export_mp4_commentary_review("sample.mp4", temp_dir, max_frames=1)
+
+            review_path = Path(temp_dir) / "review.jsonl"
+            written_rows = [json.loads(line) for line in review_path.read_text(encoding="utf-8").splitlines()]
+
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(written_rows[0]["decision_reason"], "scene_initial")
+            self.assertFalse(written_rows[0]["suppressed"])
+            self.assertIsNotNone(written_rows[0]["comment"])
+            self.assertEqual(written_rows[0]["frame_data"]["labels"], ["video_frame", "bright_scene", "wide_frame"])
+            self.assertNotIn("image", written_rows[0]["frame_data"])
+            self.assertTrue(Path(written_rows[0]["frame_path"]).exists())
 
     def test_frame_sampler_policy_limits_range_and_count(self):
         video = VideoInput(["f0", "f1", "f2", "f3", "f4"], fps=1)
