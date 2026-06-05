@@ -752,6 +752,7 @@ def export_mp4_commentary_review(
     )
     cv2 = video._load_cv2()
     resolved_pipeline = _resolve_mp4_pipeline(pipeline, vision_adapter)
+    vision_adapter_name = _vision_adapter_name(vision_adapter)
     rows: list[dict[str, object]] = []
 
     for output_index, frame in enumerate(video.iter_frames()):
@@ -768,6 +769,7 @@ def export_mp4_commentary_review(
         row = {
             "index": output_index,
             "timestamp": frame.timestamp,
+            "vision_adapter": vision_adapter_name,
             "frame_path": str(image_path),
             "frame_data": frame_data,
             "scene_summary": result.context.scene.summary if result.context.scene else None,
@@ -796,6 +798,15 @@ def _resolve_mp4_pipeline(
     if vision_adapter is not None:
         return RealtimePipeline(scene_analyzer=SceneAnalyzer(vision_adapter=vision_adapter))
     return RealtimePipeline()
+
+
+def _vision_adapter_name(vision_adapter: Callable[[Frame], SceneState | dict[str, Any] | str] | None) -> str | None:
+    if vision_adapter is None:
+        return None
+    name = getattr(vision_adapter, "__name__", None)
+    if name:
+        return str(name)
+    return type(vision_adapter).__name__
 
 
 def _scene_event_phase(event: CommentaryEvent | None) -> str | None:
