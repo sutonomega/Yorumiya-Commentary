@@ -4,13 +4,13 @@ This page keeps the current roadmap status separate from implementation details.
 
 ## Current Status
 
-Phase 1 MVP is complete. Scene events can be detected, mapped to short comments, and traced with event kind / phase / selection reason.
+Phase 1 MVP is in progress. The foundation exists, but the README MVP items are not yet accepted as complete end to end.
 
 | Milestone | Status | Notes |
 | --- | --- | --- |
-| M2 MVP Commentary Pipeline | Complete | Frame -> SceneState -> CommentaryEvent -> Comment -> SpeechItem -> SpeechAudio is covered by tests. |
+| M2 MVP Commentary Pipeline | In Progress | Video input -> Frame -> SceneState -> CommentaryEvent -> Comment -> SpeechItem is covered by tests and review tooling, but README MVP acceptance is still in progress. |
 | M3 Realtime Foundation | Complete | Scheduler, RuntimeTick, RuntimeTickTrace, RuntimeTraceRecorder, and JSONL export are available. |
-| M4 Audio Understanding | Complete for MVP | Scene, audio, and transcript events are unified; event selection and audio-derived suppression are traceable. |
+| M4 Audio Understanding | Foundation | Scene, audio, and transcript events are unified; event selection and audio-derived suppression are traceable. This supports MVP but does not by itself complete the README MVP. |
 | M5 Companion AI | Foundation | Memory persistence, conversation turns, emotion observation, and response skeleton exist. Rich behavior is future work. |
 | M6 Voice Integration | Foundation | VOICEVOX boundary, failure normalization, fake synthesizer, playback boundary, and fake player exist. Live validation is optional integration. |
 | M7 Production Runtime | Foundation | RuntimeService, metrics, snapshot, graceful stop, and file trace recording exist. Always-on operations remain future work. |

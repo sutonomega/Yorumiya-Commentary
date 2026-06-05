@@ -8,11 +8,11 @@ Current implementation status is summarized in `05_milestone_status.md`.
 
 ### Phase 1: MVP Completion
 
-目的は、ゲームの状況を検出し、自然な短文 comment を出し、なぜそうなったかを trace で追える状態にすること。
+目的は、README の最小構成である「動画入力、フレーム解析、差分検出、AIコメント生成、音声読み上げ」を一つの流れとして成立させること。
 
-Status: complete for MVP.
+Status: in progress.
 
-完了済み:
+土台として実装済み:
 
 - `combat_state`
 - `event_phase`
@@ -27,11 +27,12 @@ Status: complete for MVP.
 - `dialog_event` design docs
 - `dialog_event` phase detection
 
-今後の拡張候補:
+MVP完了までに確認すること:
 
-- `dialog_event` metadata として `speaker`、`text`、`choice` を実装する。
-- `event_phase` をさらに combat / dialog 以外へ拡張する。
-- comment 選択ロジックは、対象が増えて複雑化した場合に `_event_phase_comment()` と `_event_kind_comment()` の責務整理を検討する。
+- 実 mp4 入力から comment までの流れが、READMEのMVP項目に沿って確認できる。
+- AIコメント生成として受け入れられる最小の comment 品質を満たす。
+- 音声読み上げまでの end-to-end 境界を確認できる。
+- trace で、なぜその comment / suppression になったかを追える。
 
 ### Phase 2: Commentary Quality
 
