@@ -136,6 +136,26 @@ PY
 
 This produces sampled frame images and `review.jsonl`.
 
+Offline voice boundary check:
+
+```bash
+source .venv/bin/activate
+PYTHONPATH=src python - <<'PY'
+from yorumiya_commentary import FakeVoiceSynthesizer, RealtimePipeline, RealtimeScheduler, RuntimeTick, RealtimeLoop, VideoInput
+
+frame = next(VideoInput([{"summary": "menu opened", "labels": ["menu"], "ui_elements": ["menu"], "confidence": 0.8}], fps=1).iter_frames())
+loop = RealtimeLoop(
+    pipeline=RealtimePipeline(voice_synthesizer=FakeVoiceSynthesizer()),
+    scheduler=RealtimeScheduler(frame_interval=1.0, speech_interval=0.5),
+)
+
+trace = loop.step(RuntimeTick(timestamp=0.0, frame=frame)).to_trace()
+print(trace.frame_trace.has_comment, trace.speech_trace.synthesized, trace.speech_trace.audio_format)
+PY
+```
+
+This confirms the `Comment -> SpeechItem -> voice adapter -> SpeechAudio` boundary without requiring VOICEVOX ENGINE.
+
 ## MVP Confirmation Scope
 
 This document covers local service startup and health checks. It does not complete the MVP by itself.
