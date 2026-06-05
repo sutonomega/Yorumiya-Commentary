@@ -37,6 +37,7 @@ from .runtime import (
 )
 from .scene import SceneAnalysisConfig, SceneAnalyzer
 from .video import FrameFileInput, FrameSampler, FrameSamplingPolicy, OpenCVVideoInput, VideoInput
+from .vision import OpenCVHeuristicVisionAdapter, OpenCVHeuristicVisionConfig
 from .voice import (
     AudioPlayer,
     FakeAudioPlayer,
@@ -69,6 +70,8 @@ __all__ = [
     "FrameSampler",
     "FrameSamplingPolicy",
     "OpenCVVideoInput",
+    "OpenCVHeuristicVisionAdapter",
+    "OpenCVHeuristicVisionConfig",
     "FakeAudioPlayer",
     "FakeVoiceSynthesizer",
     "MemoryStore",

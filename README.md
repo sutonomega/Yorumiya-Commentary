@@ -262,6 +262,19 @@ results = run_mp4_commentary(
 )
 ```
 
+外部AI modelを接続する前の確認には、OpenCVだけで動く簡易adapterも使える。これは明るい高彩度エフェクトを `critical_moment` 候補として扱うbaselineで、キャラクター、敵、字幕の意味理解はしない。
+
+```python
+from yorumiya_commentary import OpenCVHeuristicVisionAdapter, run_mp4_commentary
+
+results = run_mp4_commentary(
+    "tests/fixtures/manual/Legacy.mp4",
+    vision_adapter=OpenCVHeuristicVisionAdapter(),
+    sample_interval_seconds=10.0,
+    max_frames=5,
+)
+```
+
 ---
 
 # Notes

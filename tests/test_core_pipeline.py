@@ -23,6 +23,7 @@ from yorumiya_commentary import (
     FrameSamplingPolicy,
     MemoryStore,
     OpenCVVideoInput,
+    OpenCVHeuristicVisionAdapter,
     RealtimeLoop,
     RealtimePipeline,
     RealtimeScheduler,
@@ -48,12 +49,22 @@ from yorumiya_commentary.models import AudioChunk, Comment, CommentaryContext, C
 
 
 class FakeImage:
-    def __init__(self, brightness, shape=(720, 1280, 3)):
+    def __init__(self, brightness, shape=(720, 1280, 3), effect_ratio=0.0, orange_ratio=0.0):
         self.brightness = brightness
         self.shape = shape
+        self.effect_ratio = effect_ratio
+        self.orange_ratio = orange_ratio
 
     def mean(self):
         return self.brightness
+
+
+class FakeMask:
+    def __init__(self, ratio):
+        self.ratio = ratio
+
+    def mean(self):
+        return self.ratio * 255
 
 
 class FakeVideoCapture:
@@ -83,10 +94,13 @@ class FakeVideoCapture:
 
 class FakeCv2:
     CAP_PROP_FPS = 5
+    COLOR_BGR2HSV = 40
 
-    def __init__(self, images, fps=1.0):
+    def __init__(self, images, fps=1.0, effect_ratio=0.0, orange_ratio=0.0):
         self.images = list(images)
         self.fps = fps
+        self.effect_ratio = effect_ratio
+        self.orange_ratio = orange_ratio
         self.capture = None
 
     def VideoCapture(self, path):
@@ -96,6 +110,14 @@ class FakeCv2:
     def imwrite(self, path, image):
         Path(path).write_bytes(b"fake-jpeg")
         return True
+
+    def cvtColor(self, image, code):
+        return image
+
+    def inRange(self, hsv, lower, upper):
+        if lower[0] == 5:
+            return FakeMask(getattr(hsv, "orange_ratio", self.orange_ratio))
+        return FakeMask(getattr(hsv, "effect_ratio", self.effect_ratio))
 
 
 class CorePipelineTest(unittest.TestCase):
@@ -169,6 +191,34 @@ class CorePipelineTest(unittest.TestCase):
     def test_run_mp4_commentary_rejects_pipeline_and_vision_adapter_together(self):
         with self.assertRaisesRegex(ValueError, "pipeline and vision_adapter"):
             run_mp4_commentary("sample.mp4", pipeline=RealtimePipeline(), vision_adapter=lambda frame: "field")
+
+    def test_opencv_heuristic_vision_adapter_labels_explosion_effect(self):
+        fake_cv2 = FakeCv2([], effect_ratio=0.12, orange_ratio=0.05)
+        frame = next(VideoInput([{"image": FakeImage(180, effect_ratio=0.12, orange_ratio=0.05), "width": 1280, "height": 720}], fps=1).iter_frames())
+
+        with patch.dict(sys.modules, {"cv2": fake_cv2}):
+            scene_payload = OpenCVHeuristicVisionAdapter()(frame)
+
+        self.assertEqual(scene_payload["summary"], "explosion effect video frame 1280x720")
+        self.assertIn("effect", scene_payload["labels"])
+        self.assertIn("explosion", scene_payload["labels"])
+        self.assertIn("critical", scene_payload["labels"])
+        self.assertGreaterEqual(scene_payload["confidence"], 0.65)
+
+    def test_run_mp4_commentary_with_opencv_heuristic_adapter_detects_critical_moment(self):
+        fake_cv2 = FakeCv2([FakeImage(90), FakeImage(180, effect_ratio=0.12, orange_ratio=0.05)], fps=1)
+
+        with patch.dict(sys.modules, {"cv2": fake_cv2}):
+            results = run_mp4_commentary(
+                "sample.mp4",
+                vision_adapter=OpenCVHeuristicVisionAdapter(),
+                sample_interval_seconds=1.0,
+                max_frames=2,
+            )
+
+        self.assertEqual(results[1].context.event.kind, "critical_moment")
+        self.assertEqual(results[1].context.scene.summary, "explosion effect video frame 1280x720")
+        self.assertEqual(results[1].comment_decision.comment.text, "今のは大きいね")
 
     def test_export_mp4_commentary_review_writes_frames_and_jsonl(self):
         fake_cv2 = FakeCv2([FakeImage(220)], fps=1)
