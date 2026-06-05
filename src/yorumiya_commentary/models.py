@@ -62,6 +62,7 @@ class SceneState:
     ui_elements: tuple[str, ...] = ()
     labels: tuple[str, ...] = ()
     confidence: float = 0.0
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

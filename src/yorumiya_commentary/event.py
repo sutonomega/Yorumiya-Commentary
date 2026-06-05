@@ -57,23 +57,27 @@ class EventDetector:
         if salience <= 0:
             return None
 
+        metadata = {
+            "source": "scene",
+            "added": added,
+            "removed": removed,
+            "ui_added": ui_added,
+            "ui_removed": ui_removed,
+            "summary_changed": summary_changed,
+            "confidence_delta": confidence_delta,
+            "semantic_event": semantic_event,
+            "event_phase": event_phase,
+        }
+        if kind == "dialog_event":
+            metadata.update(self._dialog_metadata(current))
+
         return CommentaryEvent(
             timestamp=current.timestamp,
             kind=kind,
             description=self._description(kind, added, removed, ui_added, ui_removed, current),
             salience=salience,
             should_speak=salience >= self.config.speak_threshold,
-            metadata={
-                "source": "scene",
-                "added": added,
-                "removed": removed,
-                "ui_added": ui_added,
-                "ui_removed": ui_removed,
-                "summary_changed": summary_changed,
-                "confidence_delta": confidence_delta,
-                "semantic_event": semantic_event,
-                "event_phase": event_phase,
-            },
+            metadata=metadata,
         )
 
     def _salience(
@@ -168,6 +172,14 @@ class EventDetector:
         if previous_has_dialog and not current_has_dialog:
             return "dialog_end"
         return None
+
+    def _dialog_metadata(self, current: SceneState) -> dict[str, object]:
+        metadata: dict[str, object] = {}
+        for source_key, target_key in (("speaker", "dialog_speaker"), ("text", "dialog_text"), ("choice", "dialog_choice")):
+            value = current.metadata.get(source_key)
+            if value is not None:
+                metadata[target_key] = value
+        return metadata
 
     def _kind(
         self,

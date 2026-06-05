@@ -330,6 +330,28 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(scene.ui_elements, ("menu", "hp"))
         self.assertEqual(scene.confidence, 1.0)
 
+    def test_scene_analyzer_preserves_dialog_metadata_contract(self):
+        frame = next(
+            VideoInput(
+                [
+                    {
+                        "summary": "dialog line",
+                        "labels": ["field", "dialog"],
+                        "speaker": "Guide",
+                        "metadata": {"text": "Take this road.", "choice": "left path"},
+                        "confidence": 0.9,
+                    }
+                ],
+                fps=1,
+            ).iter_frames()
+        )
+
+        scene = SceneAnalyzer().analyze(frame)
+
+        self.assertEqual(scene.metadata["speaker"], "Guide")
+        self.assertEqual(scene.metadata["text"], "Take this road.")
+        self.assertEqual(scene.metadata["choice"], "left path")
+
     def test_frame_file_to_scene_to_event_flow_detects_ui_change(self):
         with TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "frames.jsonl"
@@ -453,6 +475,34 @@ class CorePipelineTest(unittest.TestCase):
 
         self.assertEqual(event.kind, "dialog_event")
         self.assertEqual(event.metadata["event_phase"], "dialog_choice")
+
+    def test_event_detector_copies_dialog_metadata(self):
+        detector = EventDetector()
+        analyzer = SceneAnalyzer()
+        frames = list(
+            VideoInput(
+                [
+                    {"summary": "field view", "labels": ["field"], "confidence": 0.7},
+                    {
+                        "summary": "dialog appears",
+                        "labels": ["field", "dialog", "choice"],
+                        "speaker": "Guide",
+                        "text": "Take this road.",
+                        "choice": "left path",
+                        "confidence": 0.9,
+                    },
+                ],
+                fps=1,
+            ).iter_frames()
+        )
+
+        detector.detect(analyzer.analyze(frames[0]))
+        event = detector.detect(analyzer.analyze(frames[1]))
+
+        self.assertEqual(event.kind, "dialog_event")
+        self.assertEqual(event.metadata["dialog_speaker"], "Guide")
+        self.assertEqual(event.metadata["dialog_text"], "Take this road.")
+        self.assertEqual(event.metadata["dialog_choice"], "left path")
 
     def test_event_detector_sets_dialog_end_phase(self):
         detector = EventDetector()
@@ -955,6 +1005,42 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(trace.as_dict()["scene_event_phase"], "dialog_choice")
         self.assertEqual(trace.event_selection.scene_event_phase, "dialog_choice")
         self.assertEqual(trace.event_selection.as_dict()["scene_event_phase"], "dialog_choice")
+
+    def test_pipeline_and_selection_trace_record_dialog_metadata(self):
+        video = VideoInput(
+            [
+                {"summary": "field view", "labels": ["field"], "confidence": 0.7},
+                {
+                    "summary": "dialog appears",
+                    "labels": ["field", "dialog", "choice"],
+                    "speaker": "Guide",
+                    "text": "Take this road.",
+                    "choice": "left path",
+                    "confidence": 0.9,
+                },
+            ],
+            fps=1,
+        )
+        pipeline = RealtimePipeline()
+        frames = list(video.iter_frames())
+
+        pipeline.process_frame_step(frames[0])
+        trace = pipeline.process_frame_step(frames[1]).to_trace()
+
+        self.assertEqual(trace.event_kind, "dialog_event")
+        self.assertEqual(trace.dialog_speaker, "Guide")
+        self.assertEqual(trace.dialog_text, "Take this road.")
+        self.assertEqual(trace.dialog_choice, "left path")
+        self.assertEqual(trace.as_dict()["dialog_speaker"], "Guide")
+        self.assertEqual(trace.as_dict()["dialog_text"], "Take this road.")
+        self.assertEqual(trace.as_dict()["dialog_choice"], "left path")
+        self.assertEqual(trace.event_selection.scene_dialog_speaker, "Guide")
+        self.assertEqual(trace.event_selection.scene_dialog_text, "Take this road.")
+        self.assertEqual(trace.event_selection.scene_dialog_choice, "left path")
+        self.assertEqual(trace.event_selection.as_dict()["scene_dialog_speaker"], "Guide")
+        self.assertEqual(trace.event_selection.as_dict()["scene_dialog_text"], "Take this road.")
+        self.assertEqual(trace.event_selection.as_dict()["scene_dialog_choice"], "left path")
+        self.assertNotIn("dialog_event", EVENT_KIND_COMMENT_VARIANTS)
 
     def test_emotion_estimator_uses_critical_moment_detail_hints(self):
         cases = (
