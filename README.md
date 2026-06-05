@@ -242,6 +242,8 @@ for row in rows:
 
 内蔵の mp4 adapter は軽量な visual metadata だけを作る。ゲーム固有の理解を行う場合は、`vision_adapter` に vision model / OCR / object detector を接続する。
 
+`vision_adapter` は `str` / `dict` / `SceneState` を返せる。`dict` の場合は `summary` / `labels` / `ui_elements` / `confidence` を返せる。最低限 `summary` または `labels` があれば scene analysis と comment generation に流せる。
+
 ```python
 from yorumiya_commentary import run_mp4_commentary
 
