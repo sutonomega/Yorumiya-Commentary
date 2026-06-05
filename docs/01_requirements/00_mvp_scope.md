@@ -1,12 +1,18 @@
 # MVP Scope
 
-MVP の目的は、Yorumiya Commentary の最小 pipeline が成立することを確認することである。
+MVP の目的は、README に記載している最小構成を成立させることである。
 
-MVP は「高品質な AI 実況」を完成させる段階ではない。まず module 間の data flow、発話抑制、queue、adapter boundary が崩れないことを確認する。
+MVP は「高品質な AI 実況」を完成させる段階ではない。ただし、次の5項目が一つの流れとして動くことを成功条件にする。
+
+- 動画入力
+- フレーム解析
+- 差分検出
+- AIコメント生成
+- 音声読み上げ
 
 ## In Scope
 
-- timestamp 付き `Frame` を扱える。
+- mp4 などの動画入力から timestamp 付き `Frame` を扱える。
 - frame sampling interval を変更できる。
 - frame から `SceneState` を作れる。
 - 前回 scene と比較して `CommentaryEvent` を作れる。
@@ -14,7 +20,7 @@ MVP は「高品質な AI 実況」を完成させる段階ではない。まず
 - 発話すべきでない時に抑制できる。
 - `Comment` を短く生成できる。
 - `SpeechItem` を queue に入れられる。
-- voice adapter に発話 text を渡せる。
+- voice adapter に発話 text を渡し、音声読み上げの境界まで流せる。
 - core tests が外部 service なしで動く。
 
 ## Out of MVP
@@ -32,12 +38,14 @@ MVP は「高品質な AI 実況」を完成させる段階ではない。まず
 MVP は次の状態になれば成功とする。
 
 ```txt
-Frame
+Video input
+  -> Frame
   -> SceneState
   -> CommentaryEvent
   -> CommentaryContext
   -> Comment
   -> SpeechItem
+  -> Voice adapter
 ```
 
-この流れが tests で確認でき、外部 adapter を後から差し込めること。
+この流れが tests と実 mp4 review で確認でき、外部 adapter を後から差し込めること。
