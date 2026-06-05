@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib import request as urlrequest
 
 from .models import Comment, CommentaryContext, EmotionState, now_timestamp
 
@@ -65,6 +67,60 @@ class CommentDecision:
     comment: Comment | None
     suppressed: bool
     reason: str
+
+
+@dataclass(frozen=True)
+class OllamaCommentAdapter:
+    endpoint: str = "http://localhost:11434"
+    model: str = "qwen3:4b"
+    timeout: float = 20.0
+
+    def __call__(self, context: CommentaryContext) -> str | None:
+        payload = {
+            "model": self.model,
+            "prompt": self._prompt(context),
+            "stream": False,
+        }
+        request = urlrequest.Request(
+            f"{self.endpoint.rstrip('/')}/api/generate",
+            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urlrequest.urlopen(request, timeout=self.timeout) as response:
+            body = json.loads(response.read().decode("utf-8"))
+        if not isinstance(body, dict):
+            return None
+        return self._clean_response(body.get("response"))
+
+    def _prompt(self, context: CommentaryContext) -> str:
+        scene = context.scene
+        event = context.event
+        emotion = context.emotion
+        labels = ", ".join(scene.labels[:8]) if scene else ""
+        ui_elements = ", ".join(scene.ui_elements[:8]) if scene else ""
+        event_phase = event.metadata.get("event_phase") if event else None
+        lines = [
+            "あなたはゲーム実況者の夜宮灯です。",
+            "現在の画面とイベントに自然に反応する、日本語の短い一文だけを返してください。",
+            "markdown、JSON、候補列挙、説明文は返さないでください。",
+            "画面情報にない細部は断定しないでください。",
+            f"scene_summary: {scene.summary if scene else ''}",
+            f"scene_labels: {labels}",
+            f"ui_elements: {ui_elements}",
+            f"event_kind: {event.kind if event else ''}",
+            f"event_phase: {event_phase if isinstance(event_phase, str) else ''}",
+            f"event_description: {event.description if event else ''}",
+            f"emotion: {emotion.emotion if emotion else 'calm'}",
+        ]
+        return "\n".join(lines)
+
+    def _clean_response(self, value: object) -> str | None:
+        if not isinstance(value, str):
+            return None
+        text = " ".join(value.split()).strip()
+        text = text.strip("\"'`")
+        return text or None
 
 
 class MemoryStore:
@@ -175,9 +231,16 @@ class EmotionEstimator:
 
 
 class CommentGenerator:
-    def __init__(self, memory: MemoryStore | None = None, max_length: int = 42, policy: CommentPolicy | None = None):
+    def __init__(
+        self,
+        memory: MemoryStore | None = None,
+        max_length: int = 42,
+        policy: CommentPolicy | None = None,
+        model_adapter: Callable[[CommentaryContext], str | None] | None = None,
+    ):
         self.memory = memory or MemoryStore()
         self.policy = policy or CommentPolicy(max_length=max_length)
+        self.model_adapter = model_adapter
 
     def evaluate(self, context: CommentaryContext) -> CommentDecision:
         suppression_reason = self._suppression_reason(context)
@@ -225,7 +288,7 @@ class CommentGenerator:
 
     def _template(self, context: CommentaryContext) -> tuple[str, float, str] | None:
         if context.event:
-            base = self._event_comment(context)
+            base = self._model_comment(context) or self._event_comment(context)
             priority = context.emotion.speak_priority if context.emotion else context.event.salience
             return base, priority, context.event.kind
 
@@ -233,6 +296,18 @@ class CommentGenerator:
             return f"今の流れ、{context.transcript.text[:20]}が効いてるね", 0.35, "transcript"
 
         return None
+
+    def _model_comment(self, context: CommentaryContext) -> str | None:
+        if self.model_adapter is None:
+            return None
+        try:
+            text = self.model_adapter(context)
+        except Exception:
+            return None
+        if not isinstance(text, str):
+            return None
+        text = text.strip()
+        return text or None
 
     def _event_comment(self, context: CommentaryContext) -> str:
         assert context.event is not None

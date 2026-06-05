@@ -46,6 +46,36 @@ curl http://localhost:11434/api/tags
 
 The response should include the pulled model, for example `qwen3:4b`.
 
+Minimal comment check:
+
+```bash
+source .venv/bin/activate
+PYTHONPATH=src python - <<'PY'
+from yorumiya_commentary import CommentGenerator, OllamaCommentAdapter
+from yorumiya_commentary.models import CommentaryContext, CommentaryEvent, SceneState
+
+adapter = OllamaCommentAdapter()
+generator = CommentGenerator(model_adapter=adapter)
+context = CommentaryContext(
+    timestamp=0.0,
+    scene=SceneState(0.0, "battle enemy appears", labels=("battle", "enemy"), confidence=0.9),
+    event=CommentaryEvent(
+        0.0,
+        "combat_state",
+        "enemy appeared",
+        salience=0.9,
+        should_speak=True,
+        metadata={"event_phase": "enemy_appeared"},
+    ),
+)
+
+decision = generator.evaluate(context)
+print(decision.reason, decision.comment.text if decision.comment else None)
+PY
+```
+
+If Ollama is unavailable or returns an empty response, Yorumiya falls back to the deterministic template comment.
+
 ## VOICEVOX ENGINE
 
 Start VOICEVOX ENGINE with Docker:

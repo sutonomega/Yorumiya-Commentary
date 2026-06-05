@@ -17,6 +17,24 @@ MVP の `CommentGenerator` は prompt 実行そのものより、発話判断の
 - `stale_after_seconds`: 古くなった context を喋らないための期限。
 - `max_length`: 1回の comment の最大長。
 
+## MVP AI Comment Acceptance
+
+MVP の AI comment 生成は、ローカル LLM の Ollama に `CommentaryContext` を渡して短文 comment を得られることを受け入れ基準にする。
+固定 template はテスト、オフライン実行、Ollama 失敗時の fallback として残すが、固定 template だけでは MVP の AI comment 生成完了とは扱わない。
+
+Ollama adapter は次を満たす。
+
+- model は既定で `qwen3:4b` を使う。
+- 入力には scene summary、labels、event kind、event phase、emotion を含める。
+- 出力は日本語の短い1文だけにする。
+- markdown、JSON、説明文、複数候補は返さない。
+- scene / event から読めない詳細を断定しない。
+- 空応答や接続失敗時は template comment へ戻す。
+- 最終 comment は `CommentPolicy.max_length` と repeated suppression の対象にする。
+
+dict / `SceneState` / trace 側の構造は既存のまま使い、Ollama adapter は comment text の生成だけを担当する。
+発話可否、priority、reason、suppression は `CommentGenerator` 側で判断し、LLM 側へ移さない。
+
 ## Event Phase Comment
 
 `event_phase` がある event は、汎用 event kind より先に phase 専用の短い comment を選ぶ。
