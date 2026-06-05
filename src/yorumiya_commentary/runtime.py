@@ -91,6 +91,9 @@ class EventSelectionTrace:
     reason: str
     scene_event_kind: str | None = None
     scene_event_phase: str | None = None
+    scene_dialog_speaker: object | None = None
+    scene_dialog_text: object | None = None
+    scene_dialog_choice: object | None = None
     scene_event_salience: float | None = None
     audio_event_kind: str | None = None
     audio_event_salience: float | None = None
@@ -125,6 +128,9 @@ class EventSelectionTrace:
             reason=reason,
             scene_event_kind=scene_event.kind if scene_event else None,
             scene_event_phase=_scene_event_phase(scene_event),
+            scene_dialog_speaker=_event_metadata_value(scene_event, "dialog_speaker"),
+            scene_dialog_text=_event_metadata_value(scene_event, "dialog_text"),
+            scene_dialog_choice=_event_metadata_value(scene_event, "dialog_choice"),
             scene_event_salience=scene_event.salience if scene_event else None,
             audio_event_kind=audio_event.kind if audio_event else None,
             audio_event_salience=audio_event.salience if audio_event else None,
@@ -139,6 +145,9 @@ class EventSelectionTrace:
             "reason": self.reason,
             "scene_event_kind": self.scene_event_kind,
             "scene_event_phase": self.scene_event_phase,
+            "scene_dialog_speaker": self.scene_dialog_speaker,
+            "scene_dialog_text": self.scene_dialog_text,
+            "scene_dialog_choice": self.scene_dialog_choice,
             "scene_event_salience": self.scene_event_salience,
             "audio_event_kind": self.audio_event_kind,
             "audio_event_salience": self.audio_event_salience,
@@ -208,6 +217,9 @@ class PipelineTrace:
     event_kind: str | None
     event_source: str | None
     scene_event_phase: str | None
+    dialog_speaker: object | None
+    dialog_text: object | None
+    dialog_choice: object | None
     event_salience: float | None
     emotion: str | None
     emotion_atmosphere: str | None
@@ -230,6 +242,9 @@ class PipelineTrace:
             event_kind=event.kind if event else None,
             event_source=event.metadata.get("source", "scene") if event else None,
             scene_event_phase=_scene_event_phase(event),
+            dialog_speaker=_event_metadata_value(event, "dialog_speaker"),
+            dialog_text=_event_metadata_value(event, "dialog_text"),
+            dialog_choice=_event_metadata_value(event, "dialog_choice"),
             event_salience=event.salience if event else None,
             emotion=result.context.emotion.emotion if result.context.emotion else None,
             emotion_atmosphere=result.context.emotion.atmosphere if result.context.emotion else None,
@@ -251,6 +266,9 @@ class PipelineTrace:
             "event_kind": self.event_kind,
             "event_source": self.event_source,
             "scene_event_phase": self.scene_event_phase,
+            "dialog_speaker": self.dialog_speaker,
+            "dialog_text": self.dialog_text,
+            "dialog_choice": self.dialog_choice,
             "event_salience": self.event_salience,
             "emotion": self.emotion,
             "emotion_atmosphere": self.emotion_atmosphere,
@@ -823,6 +841,12 @@ def _scene_event_phase(event: CommentaryEvent | None) -> str | None:
         return None
     phase = event.metadata.get("event_phase")
     return phase if isinstance(phase, str) else None
+
+
+def _event_metadata_value(event: CommentaryEvent | None, key: str) -> object | None:
+    if not event:
+        return None
+    return event.metadata.get(key)
 
 
 def _decision_source(reason: str) -> str:

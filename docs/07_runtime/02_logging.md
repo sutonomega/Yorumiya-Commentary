@@ -12,6 +12,9 @@
 - `event_kind`
 - `event_source`
 - `scene_event_phase`
+- `dialog_speaker`
+- `dialog_text`
+- `dialog_choice`
 - `event_salience`
 - `emotion`
 - `emotion_atmosphere`
@@ -28,6 +31,8 @@
 
 `scene_event_phase` は scene event metadata の `event_phase` を記録する。`decision_reason=combat_state` と `scene_event_phase=combat_start` のように、大分類と小分類を分けて残すことで、phase comment が選ばれた理由を追いやすくする。
 
+`dialog_speaker`、`dialog_text`、`dialog_choice` は採用された `dialog_event` の metadata を記録する。dialog 専用 comment はまだ生成しないが、後続で会話内容を使えるように trace と context に残す。
+
 ## Event Selection Trace
 
 `EventSelectionTrace` は scene event、audio event、transcript event のどれを `CommentaryContext.event` に採用したかを記録する。
@@ -39,6 +44,9 @@
 - `reason`
 - `scene_event_kind`
 - `scene_event_phase`
+- `scene_dialog_speaker`
+- `scene_dialog_text`
+- `scene_dialog_choice`
 - `scene_event_salience`
 - `audio_event_kind`
 - `audio_event_salience`
@@ -48,6 +56,8 @@
 `reason` は `scene_only`、`audio_only`、`transcript_only`、`audio_higher_salience`、`transcript_higher_salience`、`scene_higher_or_equal_salience`、`no_event` のいずれかである。
 
 `scene_event_phase` は scene candidate の phase を記録する。`PipelineTrace.scene_event_phase` が採用後の phase を示すのに対し、`EventSelectionTrace.scene_event_phase` は選択前の scene 候補を確認するために使う。
+
+`scene_dialog_speaker`、`scene_dialog_text`、`scene_dialog_choice` は scene candidate が `dialog_event` の場合だけ入る。これにより、event selection の段階でも会話 metadata が落ちていないことを確認できる。
 
 ## Decision Source
 

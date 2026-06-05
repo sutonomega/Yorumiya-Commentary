@@ -72,12 +72,14 @@ class SceneAnalyzer:
         labels = self._normalize_labels(payload.get("labels") or payload.get("objects") or summary)
         ui_elements = self._normalize_ui_elements(payload.get("ui_elements") or payload.get("ui") or labels)
         confidence = self._coerce_confidence(payload.get("confidence"), labels)
+        metadata = self._metadata(payload)
         return SceneState(
             timestamp=float(payload.get("timestamp", frame.timestamp)),
             summary=summary or f"Frame {frame.index} from {frame.source}",
             ui_elements=ui_elements,
             labels=labels,
             confidence=confidence,
+            metadata=metadata,
         )
 
     def _from_text(self, frame: Frame, text: str) -> SceneState:
@@ -91,6 +93,14 @@ class SceneAnalyzer:
             labels=labels,
             confidence=self.config.fallback_confidence if labels else self.config.empty_confidence,
         )
+
+    def _metadata(self, payload: dict[str, Any]) -> dict[str, Any]:
+        metadata = payload.get("metadata")
+        normalized = dict(metadata) if isinstance(metadata, dict) else {}
+        for key in ("speaker", "text", "choice"):
+            if key in payload and payload[key] is not None:
+                normalized[key] = payload[key]
+        return normalized
 
     def _normalize_labels(self, value: object) -> tuple[str, ...]:
         if value is None:
