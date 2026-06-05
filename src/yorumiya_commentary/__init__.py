@@ -37,10 +37,12 @@ from .runtime import (
     RuntimeTraceRecorder,
     RuntimeMetrics,
     RuntimeService,
+    OverlayVideoExportResult,
     SpeechQueuePolicy,
     SpeechStepResult,
     SpeechTrace,
     TaskQueue,
+    export_commentary_overlay_video,
     export_mp4_commentary_review,
     run_mp4_commentary,
 )
@@ -82,6 +84,7 @@ __all__ = [
     "OpenCVHeuristicVisionAdapter",
     "OpenCVHeuristicVisionConfig",
     "OllamaCommentAdapter",
+    "OverlayVideoExportResult",
     "FakeAudioPlayer",
     "FakeVoiceSynthesizer",
     "MemoryStore",
@@ -115,6 +118,7 @@ __all__ = [
     "VoicevoxSynthesizer",
     "WhisperTranscriber",
     "comment_to_speech_item",
+    "export_commentary_overlay_video",
     "export_mp4_commentary_review",
     "run_mp4_commentary",
 ]

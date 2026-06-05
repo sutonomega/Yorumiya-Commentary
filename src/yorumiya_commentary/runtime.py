@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from collections import deque
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
@@ -733,6 +734,15 @@ class RuntimeService:
         }
 
 
+@dataclass(frozen=True)
+class OverlayVideoExportResult:
+    output_path: str
+    subtitle_path: str
+    command: tuple[str, ...]
+    comment_count: int
+    audio_count: int
+
+
 def run_mp4_commentary(
     path: str | Path,
     *,
@@ -814,6 +824,187 @@ def export_mp4_commentary_review(
     review_path = output / "review.jsonl"
     review_path.write_text("\n".join(json.dumps(row, ensure_ascii=False) for row in rows) + ("\n" if rows else ""), encoding="utf-8")
     return rows
+
+
+def export_commentary_overlay_video(
+    video_path: str | Path,
+    review_jsonl_path: str | Path,
+    output_path: str | Path,
+    *,
+    work_dir: str | Path | None = None,
+    subtitle_duration_seconds: float = 3.0,
+    include_original_audio: bool = True,
+    overwrite: bool = True,
+    run: bool = True,
+) -> OverlayVideoExportResult:
+    if subtitle_duration_seconds <= 0:
+        raise ValueError("subtitle_duration_seconds must be positive")
+
+    video = Path(video_path)
+    review = Path(review_jsonl_path)
+    output = Path(output_path)
+    work = Path(work_dir) if work_dir is not None else output.parent
+    work.mkdir(parents=True, exist_ok=True)
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    rows = _load_review_rows(review)
+    comment_rows = [row for row in rows if row.get("comment")]
+    subtitle_path = work / f"{output.stem}.comments.ass"
+    subtitle_path.write_text(_ass_subtitle_text(comment_rows, subtitle_duration_seconds), encoding="utf-8")
+
+    audio_rows = [row for row in comment_rows if row.get("audio_path")]
+    audio_paths = [_resolve_review_file(review, row["audio_path"]) for row in audio_rows]
+    has_original_audio = include_original_audio and _has_audio_stream(video) if run else include_original_audio
+    command = _overlay_ffmpeg_command(
+        video,
+        output,
+        subtitle_path,
+        audio_rows,
+        audio_paths,
+        has_original_audio=has_original_audio,
+        overwrite=overwrite,
+    )
+
+    if run:
+        subprocess.run(command, check=True)
+
+    return OverlayVideoExportResult(
+        output_path=str(output),
+        subtitle_path=str(subtitle_path),
+        command=tuple(command),
+        comment_count=len(comment_rows),
+        audio_count=len(audio_paths),
+    )
+
+
+def _load_review_rows(review_path: Path) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    if not review_path.exists():
+        raise FileNotFoundError(review_path)
+    for line in review_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        if isinstance(row, dict):
+            rows.append(row)
+    return rows
+
+
+def _ass_subtitle_text(rows: list[dict[str, object]], duration_seconds: float) -> str:
+    events = []
+    for row in rows:
+        timestamp = float(row.get("timestamp") or 0.0)
+        text = _escape_ass_text(str(row.get("comment") or ""))
+        if not text:
+            continue
+        events.append(f"Dialogue: 0,{_ass_time(timestamp)},{_ass_time(timestamp + duration_seconds)},Default,,0,0,0,,{text}")
+    return "\n".join(
+        [
+            "[Script Info]",
+            "ScriptType: v4.00+",
+            "PlayResX: 1920",
+            "PlayResY: 1080",
+            "",
+            "[V4+ Styles]",
+            "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
+            "Style: Default,Noto Sans CJK JP,48,&H00FFFFFF,&H000000FF,&H7F000000,&H7F000000,0,0,0,0,100,100,0,0,1,3,1,2,80,80,70,1",
+            "",
+            "[Events]",
+            "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
+            *events,
+            "",
+        ]
+    )
+
+
+def _overlay_ffmpeg_command(
+    video_path: Path,
+    output_path: Path,
+    subtitle_path: Path,
+    audio_rows: list[dict[str, object]],
+    audio_paths: list[Path],
+    *,
+    has_original_audio: bool,
+    overwrite: bool,
+) -> list[str]:
+    command = ["ffmpeg", "-hide_banner", "-loglevel", "warning"]
+    if overwrite:
+        command.append("-y")
+    command.extend(["-i", str(video_path)])
+    for audio_path in audio_paths:
+        command.extend(["-i", str(audio_path)])
+
+    subtitle_filter = f"[0:v]subtitles='{_escape_ffmpeg_filter_path(subtitle_path)}'[v]"
+    audio_filters: list[str] = []
+    audio_inputs: list[str] = []
+    if has_original_audio:
+        audio_filters.append("[0:a]volume=0.75[a0]")
+        audio_inputs.append("[a0]")
+    for index, (row, _audio_path) in enumerate(zip(audio_rows, audio_paths), start=1):
+        delay_ms = max(0, int(round(float(row.get("timestamp") or 0.0) * 1000)))
+        label = f"a{index}"
+        audio_filters.append(f"[{index}:a]adelay={delay_ms}|{delay_ms},volume=1.0[{label}]")
+        audio_inputs.append(f"[{label}]")
+
+    filter_parts = [subtitle_filter, *audio_filters]
+    if audio_inputs:
+        if len(audio_inputs) == 1:
+            filter_parts.append(f"{audio_inputs[0]}anull[aout]")
+        else:
+            filter_parts.append(f"{''.join(audio_inputs)}amix=inputs={len(audio_inputs)}:duration=longest:dropout_transition=0[aout]")
+
+    command.extend(["-filter_complex", ";".join(filter_parts), "-map", "[v]"])
+    if audio_inputs:
+        command.extend(["-map", "[aout]", "-c:a", "aac"])
+    elif has_original_audio:
+        command.extend(["-map", "0:a?", "-c:a", "aac"])
+    command.extend(["-c:v", "libx264", "-pix_fmt", "yuv420p", "-shortest", str(output_path)])
+    return command
+
+
+def _has_audio_stream(video_path: Path) -> bool:
+    command = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-select_streams",
+        "a:0",
+        "-show_entries",
+        "stream=index",
+        "-of",
+        "csv=p=0",
+        str(video_path),
+    ]
+    result = subprocess.run(command, check=False, capture_output=True, text=True)
+    return result.returncode == 0 and bool(result.stdout.strip())
+
+
+def _resolve_review_file(review_path: Path, value: object) -> Path:
+    path = Path(str(value))
+    if path.is_absolute() or path.exists():
+        return path
+    candidate = review_path.parent / path
+    return candidate if candidate.exists() else path
+
+
+def _ass_time(seconds: float) -> str:
+    seconds = max(0.0, seconds)
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    whole_seconds = int(seconds % 60)
+    centiseconds = int(round((seconds - int(seconds)) * 100))
+    if centiseconds >= 100:
+        whole_seconds += 1
+        centiseconds -= 100
+    return f"{hours}:{minutes:02d}:{whole_seconds:02d}.{centiseconds:02d}"
+
+
+def _escape_ass_text(text: str) -> str:
+    return text.replace("\\", "\\\\").replace("\n", "\\N").replace("{", "\\{").replace("}", "\\}")
+
+
+def _escape_ffmpeg_filter_path(path: Path) -> str:
+    return str(path.resolve()).replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
 
 
 def _resolve_mp4_pipeline(
