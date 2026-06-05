@@ -146,6 +146,30 @@ class CorePipelineTest(unittest.TestCase):
         self.assertIsNotNone(results[0].comment_decision.comment)
         self.assertEqual(results[0].comment_decision.reason, "scene_initial")
 
+    def test_run_mp4_commentary_uses_vision_adapter_with_frame_image(self):
+        images = [FakeImage(120), FakeImage(180)]
+        fake_cv2 = FakeCv2(images, fps=1)
+        adapter_frames = []
+
+        def vision_adapter(frame):
+            adapter_frames.append(frame)
+            self.assertIs(frame.data["image"], images[frame.index])
+            if frame.index == 0:
+                return {"summary": "field view", "labels": ["field"], "confidence": 0.8}
+            return {"summary": "enemy battle", "labels": ["field", "enemy", "battle"], "confidence": 0.9}
+
+        with patch.dict(sys.modules, {"cv2": fake_cv2}):
+            results = run_mp4_commentary("sample.mp4", vision_adapter=vision_adapter, sample_interval_seconds=1.0, max_frames=2)
+
+        self.assertEqual(len(adapter_frames), 2)
+        self.assertEqual(results[1].context.event.kind, "combat_state")
+        self.assertEqual(results[1].context.event.metadata["event_phase"], "enemy_appeared")
+        self.assertEqual(results[1].comment_decision.comment.text, "敵が出てきたね")
+
+    def test_run_mp4_commentary_rejects_pipeline_and_vision_adapter_together(self):
+        with self.assertRaisesRegex(ValueError, "pipeline and vision_adapter"):
+            run_mp4_commentary("sample.mp4", pipeline=RealtimePipeline(), vision_adapter=lambda frame: "field")
+
     def test_export_mp4_commentary_review_writes_frames_and_jsonl(self):
         fake_cv2 = FakeCv2([FakeImage(220)], fps=1)
 
@@ -163,6 +187,33 @@ class CorePipelineTest(unittest.TestCase):
             self.assertEqual(written_rows[0]["frame_data"]["labels"], ["video_frame", "bright_scene", "wide_frame"])
             self.assertNotIn("image", written_rows[0]["frame_data"])
             self.assertTrue(Path(written_rows[0]["frame_path"]).exists())
+
+    def test_export_mp4_commentary_review_uses_vision_adapter_scene(self):
+        fake_cv2 = FakeCv2([FakeImage(120), FakeImage(180)], fps=1)
+
+        def vision_adapter(frame):
+            if frame.index == 0:
+                return {"summary": "field view", "labels": ["field"], "confidence": 0.8}
+            return {"summary": "enemy battle", "labels": ["field", "enemy", "battle"], "confidence": 0.9}
+
+        with TemporaryDirectory() as temp_dir:
+            with patch.dict(sys.modules, {"cv2": fake_cv2}):
+                rows = export_mp4_commentary_review(
+                    "sample.mp4",
+                    temp_dir,
+                    vision_adapter=vision_adapter,
+                    sample_interval_seconds=1.0,
+                    max_frames=2,
+                )
+
+            review_path = Path(temp_dir) / "review.jsonl"
+            written_rows = [json.loads(line) for line in review_path.read_text(encoding="utf-8").splitlines()]
+
+            self.assertEqual(rows[1]["scene_summary"], "enemy battle")
+            self.assertEqual(written_rows[1]["scene_labels"], ["field", "enemy", "battle"])
+            self.assertEqual(written_rows[1]["event_kind"], "combat_state")
+            self.assertEqual(written_rows[1]["event_phase"], "enemy_appeared")
+            self.assertEqual(written_rows[1]["comment"], "敵が出てきたね")
 
     def test_frame_sampler_policy_limits_range_and_count(self):
         video = VideoInput(["f0", "f1", "f2", "f3", "f4"], fps=1)

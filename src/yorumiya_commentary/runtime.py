@@ -21,7 +21,7 @@ from .ai import (
 )
 from .audio import AudioAnalyzer, AudioEventDetector, TranscriptEventDetector, VoiceActivityDetector, WhisperTranscriber
 from .event import EventDetector
-from .models import AudioChunk, CommentaryContext, CommentaryEvent, Frame, SpeechAudio, SpeechItem
+from .models import AudioChunk, CommentaryContext, CommentaryEvent, Frame, SceneState, SpeechAudio, SpeechItem
 from .scene import SceneAnalyzer
 from .video import OpenCVVideoInput
 from .voice import AudioPlayer, PlaybackResult, SpeechStyle, SpeechSynthesizer, comment_to_speech_item
@@ -710,6 +710,7 @@ def run_mp4_commentary(
     path: str | Path,
     *,
     pipeline: RealtimePipeline | None = None,
+    vision_adapter: Callable[[Frame], SceneState | dict[str, Any] | str] | None = None,
     sample_interval_seconds: float = 2.0,
     start_timestamp: float = 0.0,
     end_timestamp: float | None = None,
@@ -722,8 +723,9 @@ def run_mp4_commentary(
         start_timestamp=start_timestamp,
         end_timestamp=end_timestamp,
         max_frames=max_frames,
+        include_image=vision_adapter is not None,
     )
-    resolved_pipeline = pipeline or RealtimePipeline()
+    resolved_pipeline = _resolve_mp4_pipeline(pipeline, vision_adapter)
     return [resolved_pipeline.process_frame_step(frame, synthesize=synthesize) for frame in video.iter_frames()]
 
 
@@ -732,6 +734,7 @@ def export_mp4_commentary_review(
     output_dir: str | Path,
     *,
     pipeline: RealtimePipeline | None = None,
+    vision_adapter: Callable[[Frame], SceneState | dict[str, Any] | str] | None = None,
     sample_interval_seconds: float = 2.0,
     start_timestamp: float = 0.0,
     end_timestamp: float | None = None,
@@ -748,7 +751,7 @@ def export_mp4_commentary_review(
         include_image=True,
     )
     cv2 = video._load_cv2()
-    resolved_pipeline = pipeline or RealtimePipeline()
+    resolved_pipeline = _resolve_mp4_pipeline(pipeline, vision_adapter)
     rows: list[dict[str, object]] = []
 
     for output_index, frame in enumerate(video.iter_frames()):
@@ -780,6 +783,19 @@ def export_mp4_commentary_review(
     review_path = output / "review.jsonl"
     review_path.write_text("\n".join(json.dumps(row, ensure_ascii=False) for row in rows) + ("\n" if rows else ""), encoding="utf-8")
     return rows
+
+
+def _resolve_mp4_pipeline(
+    pipeline: RealtimePipeline | None,
+    vision_adapter: Callable[[Frame], SceneState | dict[str, Any] | str] | None,
+) -> RealtimePipeline:
+    if pipeline is not None and vision_adapter is not None:
+        raise ValueError("pipeline and vision_adapter cannot be used together")
+    if pipeline is not None:
+        return pipeline
+    if vision_adapter is not None:
+        return RealtimePipeline(scene_analyzer=SceneAnalyzer(vision_adapter=vision_adapter))
+    return RealtimePipeline()
 
 
 def _scene_event_phase(event: CommentaryEvent | None) -> str | None:

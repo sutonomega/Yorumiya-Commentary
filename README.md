@@ -240,7 +240,27 @@ for row in rows:
 
 `review.jsonl` と sampled frame image が出力されるため、実際のシーンと comment を目視で確認できる。
 
-内蔵の mp4 adapter は軽量な visual metadata だけを作る。ゲーム固有の理解を行う場合は、`SceneAnalyzer(vision_adapter=...)` に vision model / OCR / object detector を接続する。
+内蔵の mp4 adapter は軽量な visual metadata だけを作る。ゲーム固有の理解を行う場合は、`vision_adapter` に vision model / OCR / object detector を接続する。
+
+`vision_adapter` は `str` / `dict` / `SceneState` を返せる。`dict` の場合は `summary` / `labels` / `ui_elements` / `confidence` を返せる。最低限 `summary` または `labels` があれば scene analysis と comment generation に流せる。
+
+```python
+from yorumiya_commentary import run_mp4_commentary
+
+def vision_adapter(frame):
+    # imageをOCR/画像分類に渡し、その結果を返す想定
+    return {
+        "summary": "enemy battle",
+        "labels": ["battle", "enemy"],
+        "confidence": 0.9,
+    }
+
+results = run_mp4_commentary(
+    "tests/fixtures/manual/Legacy.mp4",
+    vision_adapter=vision_adapter,
+    max_frames=2,
+)
+```
 
 ---
 
