@@ -1360,6 +1360,39 @@ class CorePipelineTest(unittest.TestCase):
         self.assertEqual(trace.speech_trace.audio_format, "fake-wav")
         self.assertTrue(trace.as_dict()["speech_trace"]["has_speech_audio"])
 
+    def test_runtime_tick_trace_confirms_mvp_voice_boundary_end_to_end(self):
+        fake_voice = FakeVoiceSynthesizer()
+        frame = next(
+            VideoInput(
+                [
+                    {
+                        "summary": "menu opened",
+                        "labels": ["menu"],
+                        "ui_elements": ["menu"],
+                        "confidence": 0.8,
+                    }
+                ],
+                fps=1,
+            ).iter_frames()
+        )
+        loop = RealtimeLoop(
+            pipeline=RealtimePipeline(voice_synthesizer=fake_voice),
+            scheduler=RealtimeScheduler(frame_interval=1.0, speech_interval=0.5),
+        )
+
+        trace = loop.step(RuntimeTick(timestamp=0.0, frame=frame)).to_trace()
+
+        self.assertTrue(trace.frame_trace.has_comment)
+        self.assertTrue(trace.frame_trace.has_speech_item)
+        self.assertTrue(trace.speech_trace.synthesized)
+        self.assertTrue(trace.speech_trace.has_speech_item)
+        self.assertTrue(trace.speech_trace.has_speech_audio)
+        self.assertEqual(trace.speech_trace.audio_format, "fake-wav")
+        self.assertEqual(len(fake_voice.items), 1)
+        self.assertTrue(fake_voice.items[0].text)
+        self.assertTrue(trace.as_dict()["speech_trace"]["synthesized"])
+        self.assertEqual(trace.as_dict()["speech_trace"]["audio_format"], "fake-wav")
+
     def test_runtime_tick_trace_records_speech_skip_without_frame(self):
         loop = RealtimeLoop(
             pipeline=RealtimePipeline(voice_synthesizer=FakeVoiceSynthesizer()),
