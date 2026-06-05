@@ -1,6 +1,15 @@
 """Yorumiya Commentary core package."""
 
-from .ai import CommentDecision, CommentGenerator, CommentPolicy, CompanionMode, ConversationTurn, EmotionEstimator, MemoryStore
+from .ai import (
+    CommentDecision,
+    CommentGenerator,
+    CommentPolicy,
+    CompanionMode,
+    ConversationTurn,
+    EmotionEstimator,
+    MemoryStore,
+    OllamaCommentAdapter,
+)
 from .audio import (
     AudioAnalyzer,
     AudioEventDetectionPolicy,
@@ -72,6 +81,7 @@ __all__ = [
     "OpenCVVideoInput",
     "OpenCVHeuristicVisionAdapter",
     "OpenCVHeuristicVisionConfig",
+    "OllamaCommentAdapter",
     "FakeAudioPlayer",
     "FakeVoiceSynthesizer",
     "MemoryStore",

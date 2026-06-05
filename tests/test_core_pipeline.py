@@ -24,6 +24,7 @@ from yorumiya_commentary import (
     MemoryStore,
     OpenCVVideoInput,
     OpenCVHeuristicVisionAdapter,
+    OllamaCommentAdapter,
     RealtimeLoop,
     RealtimePipeline,
     RealtimeScheduler,
@@ -46,7 +47,7 @@ from yorumiya_commentary import (
     run_mp4_commentary,
 )
 from yorumiya_commentary.ai import CRITICAL_DETAIL_COMMENT_VARIANTS, EVENT_KIND_COMMENT_VARIANTS, EVENT_PHASE_COMMENT_VARIANTS
-from yorumiya_commentary.models import AudioChunk, Comment, CommentaryContext, CommentaryEvent, SpeechAudio, SpeechItem, Transcript, VadResult
+from yorumiya_commentary.models import AudioChunk, Comment, CommentaryContext, CommentaryEvent, EmotionState, SceneState, SpeechAudio, SpeechItem, Transcript, VadResult
 
 
 class FakeImage:
@@ -119,6 +120,20 @@ class FakeCv2:
         if lower[0] == 5:
             return FakeMask(getattr(hsv, "orange_ratio", self.orange_ratio))
         return FakeMask(getattr(hsv, "effect_ratio", self.effect_ratio))
+
+
+class FakeHttpResponse:
+    def __init__(self, payload):
+        self.payload = payload
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def read(self):
+        return json.dumps(self.payload, ensure_ascii=False).encode("utf-8")
 
 
 class CorePipelineTest(unittest.TestCase):
@@ -695,6 +710,79 @@ class CorePipelineTest(unittest.TestCase):
         self.assertFalse(decision.suppressed)
         self.assertEqual(decision.reason, "item_update")
         self.assertEqual(decision.comment.text, "何か手に入ったね")
+
+    def test_ollama_comment_adapter_posts_context_to_generate_api(self):
+        requests = []
+
+        def fake_urlopen(request, timeout):
+            requests.append((request, timeout))
+            return FakeHttpResponse({"response": "ここは攻めどころだね"})
+
+        adapter = OllamaCommentAdapter(endpoint="http://ollama.test", model="qwen3:4b", timeout=3.0)
+        context = CommentaryContext(
+            timestamp=1.0,
+            scene=SceneState(1.0, "battle enemy appears", labels=("battle", "enemy"), ui_elements=("hp",), confidence=0.9),
+            event=CommentaryEvent(
+                timestamp=1.0,
+                kind="combat_state",
+                description="enemy appeared",
+                salience=0.9,
+                should_speak=True,
+                metadata={"event_phase": "enemy_appeared"},
+            ),
+            emotion=EmotionState(1.0, 0.8, "excited", "high", 0.8),
+        )
+
+        with patch("yorumiya_commentary.ai.urlrequest.urlopen", fake_urlopen):
+            text = adapter(context)
+
+        self.assertEqual(text, "ここは攻めどころだね")
+        self.assertEqual(len(requests), 1)
+        request, timeout = requests[0]
+        payload = json.loads(request.data.decode("utf-8"))
+        self.assertEqual(request.full_url, "http://ollama.test/api/generate")
+        self.assertEqual(timeout, 3.0)
+        self.assertEqual(payload["model"], "qwen3:4b")
+        self.assertFalse(payload["stream"])
+        self.assertIn("battle enemy appears", payload["prompt"])
+        self.assertIn("combat_state", payload["prompt"])
+        self.assertIn("enemy_appeared", payload["prompt"])
+        self.assertIn("excited", payload["prompt"])
+
+    def test_comment_generator_uses_model_adapter_comment_when_available(self):
+        generator = CommentGenerator(model_adapter=lambda context: "  ここはAIコメントだね  ")
+        event = CommentaryEvent(
+            timestamp=1.0,
+            kind="critical_moment",
+            description="Critical moment detected",
+            salience=0.9,
+            should_speak=True,
+        )
+
+        decision = generator.evaluate(CommentaryContext(timestamp=1.0, event=event))
+
+        self.assertFalse(decision.suppressed)
+        self.assertEqual(decision.reason, "critical_moment")
+        self.assertEqual(decision.comment.text, "ここはAIコメントだね")
+
+    def test_comment_generator_falls_back_to_template_when_model_adapter_fails(self):
+        def broken_adapter(context):
+            raise RuntimeError("ollama down")
+
+        generator = CommentGenerator(model_adapter=broken_adapter)
+        event = CommentaryEvent(
+            timestamp=1.0,
+            kind="critical_moment",
+            description="Critical moment detected",
+            salience=0.9,
+            should_speak=True,
+        )
+
+        decision = generator.evaluate(CommentaryContext(timestamp=1.0, event=event))
+
+        self.assertFalse(decision.suppressed)
+        self.assertEqual(decision.reason, "critical_moment")
+        self.assertEqual(decision.comment.text, "今のは大きいね")
 
     def test_comment_generator_reports_suppression_reasons(self):
         generator = CommentGenerator(policy=CommentPolicy(min_salience=0.5, stale_after_seconds=1.0))
