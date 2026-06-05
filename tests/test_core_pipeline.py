@@ -43,6 +43,7 @@ from yorumiya_commentary import (
     VoiceSynthesisError,
     WhisperTranscriber,
     comment_to_speech_item,
+    export_commentary_overlay_video,
     export_mp4_commentary_review,
     run_mp4_commentary,
 )
@@ -307,6 +308,48 @@ class CorePipelineTest(unittest.TestCase):
             self.assertEqual(written_rows[1]["vision_adapter"], "OpenCVHeuristicVisionAdapter")
             self.assertEqual(written_rows[1]["event_kind"], "critical_moment")
             self.assertEqual(written_rows[1]["comment"], "すごいエフェクト出たね")
+
+    def test_export_commentary_overlay_video_builds_subtitles_and_ffmpeg_command(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            video_path = root / "source.mp4"
+            audio_path = root / "voice.wav"
+            review_path = root / "review.jsonl"
+            output_path = root / "overlay.mp4"
+            video_path.write_bytes(b"fake-mp4")
+            audio_path.write_bytes(b"fake-wav")
+            review_path.write_text(
+                json.dumps(
+                    {
+                        "timestamp": 1.25,
+                        "comment": "ここ、動いたね",
+                        "audio_path": str(audio_path),
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n"
+                + json.dumps({"timestamp": 3.0, "comment": None}, ensure_ascii=False)
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = export_commentary_overlay_video(
+                video_path,
+                review_path,
+                output_path,
+                work_dir=root,
+                include_original_audio=False,
+                run=False,
+            )
+            subtitle = Path(result.subtitle_path).read_text(encoding="utf-8")
+
+        self.assertEqual(result.comment_count, 1)
+        self.assertEqual(result.audio_count, 1)
+        self.assertIn("Dialogue: 0,0:00:01.25,0:00:04.25", subtitle)
+        self.assertIn("ここ、動いたね", subtitle)
+        self.assertIn("subtitles=", " ".join(result.command))
+        self.assertIn("adelay=1250|1250", " ".join(result.command))
+        self.assertIn(str(output_path), result.command)
 
     def test_frame_sampler_policy_limits_range_and_count(self):
         video = VideoInput(["f0", "f1", "f2", "f3", "f4"], fps=1)
