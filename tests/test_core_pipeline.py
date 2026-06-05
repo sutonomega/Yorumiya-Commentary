@@ -45,6 +45,7 @@ from yorumiya_commentary import (
     export_mp4_commentary_review,
     run_mp4_commentary,
 )
+from yorumiya_commentary.ai import CRITICAL_DETAIL_COMMENT_VARIANTS, EVENT_KIND_COMMENT_VARIANTS, EVENT_PHASE_COMMENT_VARIANTS
 from yorumiya_commentary.models import AudioChunk, Comment, CommentaryContext, CommentaryEvent, SpeechAudio, SpeechItem, Transcript, VadResult
 
 
@@ -519,6 +520,14 @@ class CorePipelineTest(unittest.TestCase):
                 self.assertFalse(decision.suppressed)
                 self.assertEqual(decision.reason, "combat_state")
                 self.assertEqual(decision.comment.text, expected_text)
+
+    def test_comment_variant_maps_keep_stable_first_candidate(self):
+        self.assertEqual(EVENT_PHASE_COMMENT_VARIANTS["combat_start"][0], "戦闘が始まったね")
+        self.assertEqual(EVENT_KIND_COMMENT_VARIANTS["critical_moment"][0], "今のは大きいね")
+        self.assertEqual(CRITICAL_DETAIL_COMMENT_VARIANTS["explosion_effect"][0], "すごいエフェクト出たね")
+        self.assertIsInstance(EVENT_PHASE_COMMENT_VARIANTS["combat_start"], tuple)
+        self.assertIsInstance(EVENT_KIND_COMMENT_VARIANTS["critical_moment"], tuple)
+        self.assertIsInstance(CRITICAL_DETAIL_COMMENT_VARIANTS["explosion_effect"], tuple)
 
     def test_comment_generator_suppresses_repeated_phase_comment(self):
         generator = CommentGenerator()
