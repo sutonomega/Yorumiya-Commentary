@@ -208,6 +208,9 @@ class CommentGenerator:
             added = context.event.metadata.get("added", [])
             target = ", ".join(added[:2]) if isinstance(added, list) and added else ""
             return f"画面に{target}が増えたね" if target else "画面の要素が変わったね"
+        critical_detail_comment = self._critical_detail_comment(context.event.kind, context.event.metadata)
+        if critical_detail_comment:
+            return critical_detail_comment
         event_kind_comment = EVENT_KIND_COMMENTS.get(context.event.kind)
         if event_kind_comment:
             return event_kind_comment
@@ -222,6 +225,22 @@ class CommentGenerator:
         if not isinstance(event_phase, str):
             return None
         return EVENT_PHASE_COMMENTS.get(event_phase)
+
+    def _critical_detail_comment(self, kind: str, metadata: dict[str, object]) -> str | None:
+        if kind != "critical_moment":
+            return None
+        labels = self._metadata_labels(metadata)
+        if {"explosion", "effect"} & labels:
+            return "すごいエフェクト出たね"
+        return None
+
+    def _metadata_labels(self, metadata: dict[str, object]) -> set[str]:
+        labels: set[str] = set()
+        for key in ("labels", "added"):
+            value = metadata.get(key)
+            if isinstance(value, list):
+                labels.update(str(label) for label in value)
+        return labels
 
     def _trim(self, text: str) -> str:
         return text if len(text) <= self.policy.max_length else text[: self.policy.max_length - 1] + "…"
